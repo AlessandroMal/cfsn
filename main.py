@@ -5,25 +5,24 @@ import numpy as np
 
 plt.close('all')
 
-##### TO DO:
-### how to deal with superposition of dots?
-### add lengthscale (what is the length of one pixel? important for height profile!)
 
 ##################
 ### user input ###
 ##################
 
-N_resolution = 200 # pixel in x and y direction (in total: N_resolution² pixel)
-N_dots = int(input('N_dots: ')) # number of dots on surface
-tipSize = 50 # size of tip (=size of structuring element)
+N_resolutionSurface = 200 # number of pixel in x and y direction of surface (in total: N_resolutionSurface² pixel)
+sideLength = 10 # side length of surface (in certain unit)
+N_dots = 6 # number of dots on surface
+N_resolutionTip = 50 # numberof pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
 
+pixelSideLength = sideLength/N_resolutionSurface # side length of one pixel 
 
 ######################################
 ### generate surface, tip and image###
 ######################################
 
-surface = subRoutines.generateSurface(N_resolution, N_dots)
-tip = subRoutines.generateTip(tipSize)
+surface = subRoutines.generateSurface(N_resolutionSurface, N_dots, sideLength)
+tip = subRoutines.generateTip(N_resolutionTip, sideLength)
 image = mph.grey_dilation(surface, structure=-tip)
 
 
@@ -43,9 +42,9 @@ for i in plotDict:
     
     # 3D surface plot
     if i=='tip':
-        x = np.linspace(0, tipSize-1, tipSize) * np.ones([tipSize, tipSize])
+        x = np.linspace(0, pixelSideLength*N_resolutionTip, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
     else:
-        x = np.linspace(0, N_resolution-1, N_resolution) * np.ones([N_resolution, N_resolution])
+        x = np.linspace(0, sideLength, N_resolutionSurface) * np.ones([N_resolutionSurface, N_resolutionSurface])
     y = x.T
     fig = plt.figure()
     ax= fig.gca(projection='3d')

@@ -1,17 +1,17 @@
 import numpy as np
 from random import uniform
 
-def generateSurface(N_resolution, N_dots):
+def generateSurface(N_resolutionSurface, N_dots, sideLength):
     
-    x = np.linspace(0, N_resolution-1, N_resolution) * np.ones([N_resolution, N_resolution])
+    x = np.linspace(0, sideLength, N_resolutionSurface) * np.ones([N_resolutionSurface, N_resolutionSurface])
     y = x.T
-    z = np.zeros([N_resolution, N_resolution])
+    z = np.zeros([N_resolutionSurface, N_resolutionSurface])
     
     for i in range(N_dots):
         
-        R = uniform(0.05*N_resolution, 0.25*N_resolution)
-        x0 = uniform(0, N_resolution)
-        y0 = uniform(0, N_resolution)
+        R = uniform(0.05*sideLength, 0.25*sideLength)
+        x0 = uniform(0, sideLength)
+        y0 = uniform(0, sideLength)
         
         dot = np.sqrt(R**2 - (x - x0)**2 - (y - y0)**2) + R
         dot = np.nan_to_num(dot)
@@ -21,11 +21,13 @@ def generateSurface(N_resolution, N_dots):
     return z
    
 
-def generateTip(tipSize):
-
-    x = np.linspace(0, tipSize-1, tipSize) * np.ones([tipSize, tipSize])
+def generateTip(N_resolutionTip, pixelSideLength):
+    
+    tipSideLength = pixelSideLength*N_resolutionTip
+    
+    x = np.linspace(0, tipSideLength, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
     y = x.T
     
-    tip = 0.3*(x - tipSize/2)**2 + 0.3*(y - tipSize/2)**2
+    tip = 0.3*(x - tipSideLength/2)**2 + 0.3*(y - tipSideLength/2)**2
 
     return tip
