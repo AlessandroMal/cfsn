@@ -12,7 +12,7 @@ plt.close('all')
 
 N_resolutionSurface = 200 # number of pixel in x and y direction of surface (in total: N_resolutionSurface² pixel)
 sideLength = 10 # side length of surface (in certain unit)
-N_dots = 6 # number of dots on surface
+N_dots = 5 # number of dots on surface
 N_resolutionTip = 50 # numberof pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
 
 pixelSideLength = sideLength/N_resolutionSurface # side length of one pixel 
@@ -22,7 +22,7 @@ pixelSideLength = sideLength/N_resolutionSurface # side length of one pixel
 ######################################
 
 surface = subRoutines.generateSurface(N_resolutionSurface, N_dots, sideLength)
-tip = subRoutines.generateTip(N_resolutionTip, sideLength)
+tip = subRoutines.generateTip(N_resolutionTip, pixelSideLength)
 image = mph.grey_dilation(surface, structure=-tip)
 
 
@@ -56,7 +56,7 @@ plt.show()
 '''
 # plot 
 plt.figure()
-plt.plot(surface[int(N_resolution/2)])
-plt.plot(image[int(N_resolution/2)])
-plt.plot(tip[int(tipSize/2)])
+plt.plot(surface[int(N_resolutionSurface/2)])
+plt.plot(image[int(N_resolutionSurface/2)])
+plt.plot(tip[int(N_resolutionTip/2)])
 '''

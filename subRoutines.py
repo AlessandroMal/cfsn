@@ -28,6 +28,6 @@ def generateTip(N_resolutionTip, pixelSideLength):
     x = np.linspace(0, tipSideLength, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
     y = x.T
     
-    tip = 0.3*(x - tipSideLength/2)**2 + 0.3*(y - tipSideLength/2)**2
+    tip = 2*(x - tipSideLength/2)**2 + 2*(y - tipSideLength/2)**2
 
     return tip
