@@ -22,7 +22,9 @@ tipSize = 50 # size of tip (=size of structuring element)
 ### generate surface, tip and image###
 ######################################
 
-surface = subRoutines.generateSurface(N_resolution, N_dots)
+#surface = subRoutines.genUnifSph(N_resolution, N_dots, 0.05*N_resolution, 0.25*N_resolution)
+surface = subRoutines.genNormSph(N_resolution, N_dots, 0.1*N_resolution, 0.05*N_resolution)
+#surface = subRoutines.generateSurface(N_resolution, N_dots)
 tip = subRoutines.generateTip(tipSize)
 image = mph.grey_dilation(surface, structure=-tip)
 
