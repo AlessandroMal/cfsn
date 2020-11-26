@@ -11,25 +11,22 @@ plt.close('all')
 ##################
 
 N_resolutionSurface = 200 # number of pixel in x and y direction of surface (in total: N_resolutionSurface² pixel)
-sideLength = 10 # side length of surface (in certain unit)
+sideLengthSurface = 10 # side length of surface (in certain unit)
 N_dots = 5 # number of dots on surface
-N_resolutionTip = 50 # numberof pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
+N_resolutionTip = 50 # number of pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
 
-pixelSideLength = sideLength/N_resolutionSurface # side length of one pixel 
+pixelLength = sideLengthSurface/N_resolutionSurface # side length of one pixel (in certain unit)
 
 ######################################
 ### generate surface, tip and image###
 ######################################
 
-<<<<<<< HEAD
-#surface = subRoutines.genUnifSph(N_resolution, N_dots, 0.05*N_resolution, 0.25*N_resolution)
-surface = subRoutines.genNormSph(N_resolution, N_dots, 0.1*N_resolution, 0.05*N_resolution)
-#surface = subRoutines.generateSurface(N_resolution, N_dots)
-tip = subRoutines.generateTip(tipSize)
-=======
-surface = subRoutines.generateSurface(N_resolutionSurface, N_dots, sideLength)
-tip = subRoutines.generateTip(N_resolutionTip, pixelSideLength)
->>>>>>> 36ff4f129e582131ec365675ff64dc5c5e17a944
+#surface = subRoutines.generateSurface(N_resolutionSurface, N_dots, sideLengthSurface)
+#surface = subRoutines.genUnifSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.05*sideLengthSurface, 0.25*sideLengthSurface)
+surface = subRoutines.genNormSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.1*sideLengthSurface, 0.05*sideLengthSurface)
+
+tip = subRoutines.generateTip(N_resolutionTip, pixelLength)
+
 image = mph.grey_dilation(surface, structure=-tip)
 
 
@@ -49,9 +46,9 @@ for i in plotDict:
     
     # 3D surface plot
     if i=='tip':
-        x = np.linspace(0, pixelSideLength*N_resolutionTip, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
+        x = np.linspace(0, pixelLength*N_resolutionTip, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
     else:
-        x = np.linspace(0, sideLength, N_resolutionSurface) * np.ones([N_resolutionSurface, N_resolutionSurface])
+        x = np.linspace(0, sideLengthSurface, N_resolutionSurface) * np.ones([N_resolutionSurface, N_resolutionSurface])
     y = x.T
     fig = plt.figure()
     ax= fig.gca(projection='3d')

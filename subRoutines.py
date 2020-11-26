@@ -1,22 +1,17 @@
 import numpy as np
 from random import uniform
 
-def generateSurface(N_resolutionSurface, N_dots, sideLength):
+def generateSurface(N_resolutionSurface, N_dots, sideLengthSurface):
     
-    x = np.linspace(0, sideLength, N_resolutionSurface) * np.ones([N_resolutionSurface, N_resolutionSurface])
+    x = np.linspace(0, sideLengthSurface, N_resolutionSurface) * np.ones([N_resolutionSurface, N_resolutionSurface])
     y = x.T
-<<<<<<< HEAD
-    z = np.zeros([N_resolution, N_resolution])
-
-=======
     z = np.zeros([N_resolutionSurface, N_resolutionSurface])
-    
->>>>>>> 36ff4f129e582131ec365675ff64dc5c5e17a944
+
     for i in range(N_dots):
         
-        R = uniform(0.05*sideLength, 0.25*sideLength)
-        x0 = uniform(0, sideLength)
-        y0 = uniform(0, sideLength)
+        R = uniform(0.05*sideLengthSurface, 0.25*sideLengthSurface)
+        x0 = uniform(0, sideLengthSurface)
+        y0 = uniform(0, sideLengthSurface)
         
         dot = np.sqrt(R**2 - (x - x0)**2 - (y - y0)**2) + R
         dot = np.nan_to_num(dot)
@@ -26,9 +21,9 @@ def generateSurface(N_resolutionSurface, N_dots, sideLength):
     return z
    
 
-def generateTip(N_resolutionTip, pixelSideLength):
+def generateTip(N_resolutionTip, pixelLength):
     
-    tipSideLength = pixelSideLength*N_resolutionTip
+    tipSideLength = pixelLength*N_resolutionTip
     
     x = np.linspace(0, tipSideLength, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
     y = x.T
@@ -37,8 +32,9 @@ def generateTip(N_resolutionTip, pixelSideLength):
 
     return tip
 
-def genUnifSph(N_res, N_dots, rmin, rmax):
-#questa genera la mappa senza creare due matrici in più, usa già la griglia che z hanella sua definizione naturale
+
+def genUnifSph(N_res, N_dots, l_side, pixelLength,  rmin, rmax):
+#questa genera la mappa senza creare due matrici in più, usa già la griglia che z ha nella sua definizione naturale
 #può essere utile e più rapido se ho tanti pixel (N_res alto)
 #mi pare più efficace di definire una doppia griglia, ditemi voi
 #in più passo l'intervallo di generazione del raggio dal main
@@ -48,19 +44,20 @@ def genUnifSph(N_res, N_dots, rmin, rmax):
     for i in range(N_dots):
         
         R = uniform(rmin, rmax)
-        x0 = uniform(0, N_res)
-        y0 = uniform(0, N_res)
-        dot=np.zeros([N_res, N_res])
+        x0 = uniform(0, l_side)
+        y0 = uniform(0, l_side)
+        dot = np.zeros([N_res, N_res])
         
         for x in range(N_res):
             for y in range(N_res):
-                if R**2 - (x - x0)**2 - (y - y0)**2>0:
-                    dot[x,y] += np.sqrt(R**2 - (x - x0)**2 - (y - y0)**2) + R
+                if R**2 - (x*pixelLength - x0)**2 - (y*pixelLength - y0)**2 > 0:
+                    dot[x,y] += np.sqrt(R**2 - (x*pixelLength - x0)**2 - (y*pixelLength - y0)**2) + R
 #l'if è solo per togliere il warning del nan di python mi dava fastidio            
         z = z + dot
     return z
 
-def genNormSph(N_res, N_dots, av, var):
+
+def genNormSph(N_res, N_dots, l_side, pixelLength, av, var):
 #come prima ma raggi con distribuzione normale
 #Alessandro
     z = np.zeros([N_res, N_res])
@@ -74,14 +71,14 @@ def genNormSph(N_res, N_dots, av, var):
             if R>0:
                 break
         
-        x0 = uniform(0, N_res)
-        y0 = uniform(0, N_res)
-        dot=np.zeros([N_res, N_res])
+        x0 = uniform(0, l_side)
+        y0 = uniform(0, l_side)
+        dot = np.zeros([N_res, N_res])
         
         for x in range(N_res):
             for y in range(N_res):
-                if R**2 - (x - x0)**2 - (y - y0)**2>0:
-                    dot[x,y] += np.sqrt(R**2 - (x - x0)**2 - (y - y0)**2) + R
+                if R**2 - (x*pixelLength - x0)**2 - (y*pixelLength - y0)**2>0:
+                    dot[x,y] += np.sqrt(R**2 - (x*pixelLength - x0)**2 - (y*pixelLength - y0)**2) + R
             
         z = z + dot
     return z
