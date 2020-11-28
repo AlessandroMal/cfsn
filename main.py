@@ -1,3 +1,4 @@
+import sys
 import subRoutines
 import matplotlib.pyplot as plt
 import scipy.ndimage.morphology as mph
@@ -10,12 +11,14 @@ plt.close('all')
 ### user input ###
 ##################
 
-N_resolutionSurface = 200 # number of pixel in x and y direction of surface (in total: N_resolutionSurface² pixel)
-sideLengthSurface = 10 # side length of surface (in certain unit)
-N_dots = 5 # number of dots on surface
-N_resolutionTip = 50 # number of pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
+argsInput = True if len(sys.argv) == 5 else False # checks if an input is given (attention: "main.py" is counted as an input)
 
-pixelLength = sideLengthSurface/N_resolutionSurface # side length of one pixel (in certain unit)
+N_resolutionSurface = int(sys.argv[1]) if argsInput == True else 200 # number of pixel in x and y direction of surface (in total: N_resolutionSurface² pixel)
+sideLengthSurface = int(sys.argv[2]) if argsInput == True else 10 # side length of surface (in certain unit)
+N_dots = int(sys.argv[3]) if argsInput == True else 10 # number of dots on surface
+N_resolutionTip = int(sys.argv[4]) if argsInput == True else 50 # number of pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
+
+pixelLength = sideLengthSurface/(N_resolutionSurface-1) # side length of one pixel (in certain unit)
 
 ######################################
 ### generate surface, tip and image###
