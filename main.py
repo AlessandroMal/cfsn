@@ -26,7 +26,7 @@ pixelLength = sideLengthSurface/(N_resolutionSurface-1) # side length of one pix
 
 #surface = subRoutines.generateSurface(N_resolutionSurface, N_dots, sideLengthSurface)
 #surface = subRoutines.genUnifSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.05*sideLengthSurface, 0.25*sideLengthSurface)
-surface = subRoutines.genNormSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.1*sideLengthSurface, 0.05*sideLengthSurface)
+surface = subRoutines.genNormSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.1*sideLengthSurface, 0)
 
 tip = subRoutines.generateTip(N_resolutionTip, pixelLength)
 
@@ -44,6 +44,8 @@ for i in plotDict:
     plt.figure()
     plt.title(i)
     plt.axis('equal')
+    plt.xlabel('x [a.u.]')
+    plt.ylabel('y [a.u.]')
     plt.pcolor(plotDict[i])
     plt.colorbar()
     
