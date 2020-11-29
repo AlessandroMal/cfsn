@@ -1,5 +1,6 @@
 import numpy as np
 from random import uniform
+import scipy.ndimage
 
 def generateSurface(N_resolutionSurface, N_dots, sideLengthSurface):
     
@@ -105,3 +106,16 @@ def genNormSph(N_res, N_dots, l_side, pixelLength, av, var):
         
     return z
 
+
+def identSph(image, N_dots):
+
+    imageNonZero = (image>0) # true if element is not zero
+    labeledObjects = scipy.ndimage.label(imageNonZero)[0] # label single objects with 1, 2, 3,...
+    singleObjectsIndexes = scipy.ndimage.find_objects(labeledObjects) # find indexes of single objects
+    
+    if len(singleObjectsIndexes) != N_dots:
+        raise Exception('identSph couldn\'t find all objects!')
+    
+    singleObjects = [image[i] for i in singleObjectsIndexes] # put subarrays of single objects in one list
+
+    return singleObjects

@@ -23,9 +23,9 @@ m_tip = int(sys.argv[7]) if argsInput == True else 0.5 # asymptotic slope of tip
 
 pixelLength = sideLengthSurface/(N_resolutionSurface-1) # side length of one pixel (in certain unit)
 
-######################################
-### generate surface, tip and image###
-######################################
+#######################################
+### generate surface, tip and image ###
+#######################################
 
 #surface = subRoutines.generateSurface(N_resolutionSurface, N_dots, sideLengthSurface)
 #surface = subRoutines.genUnifSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.05*sideLengthSurface, 0.25*sideLengthSurface)
@@ -35,6 +35,11 @@ tip = subRoutines.generateTip(N_resolutionTip, pixelLength, typeTip, R_tip, m_ti
 
 image = mph.grey_dilation(surface, structure=-tip)
 
+###############################################
+### calculation of morphological parameters ###
+###############################################
+
+singleObjects = subRoutines.identSph(image, N_dots)
 
 ###################################
 ### plot surface, tip and image ###
