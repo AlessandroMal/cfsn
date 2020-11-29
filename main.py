@@ -11,12 +11,15 @@ plt.close('all')
 ### user input ###
 ##################
 
-argsInput = True if len(sys.argv) == 5 else False # checks if an input is given (attention: "main.py" is counted as an input)
+argsInput = True if len(sys.argv) == 8 else False # checks if an input is given (attention: "main.py" is counted as an input)
 
 N_resolutionSurface = int(sys.argv[1]) if argsInput == True else 200 # number of pixel in x and y direction of surface (in total: N_resolutionSurface² pixel)
 sideLengthSurface = int(sys.argv[2]) if argsInput == True else 10 # side length of surface (in certain unit)
 N_dots = int(sys.argv[3]) if argsInput == True else 10 # number of dots on surface
-N_resolutionTip = int(sys.argv[4]) if argsInput == True else 50 # number of pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
+N_resolutionTip = int(sys.argv[4]) if argsInput == True else 100 # number of pixel in x and y direction of tip (in total: N_resolutionTip² pixel)
+typeTip = sys.argv[5] if argsInput == True else 'parabolic' # type of tip
+R_tip = int(sys.argv[6]) if argsInput == True else 0.2 # radius of curvature of tip
+m_tip = int(sys.argv[7]) if argsInput == True else 0.5 # asymptotic slope of tip (only for hyperbolic tip: theta = 2m)
 
 pixelLength = sideLengthSurface/(N_resolutionSurface-1) # side length of one pixel (in certain unit)
 
@@ -28,7 +31,7 @@ pixelLength = sideLengthSurface/(N_resolutionSurface-1) # side length of one pix
 #surface = subRoutines.genUnifSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.05*sideLengthSurface, 0.25*sideLengthSurface)
 surface = subRoutines.genNormSph(N_resolutionSurface, N_dots, sideLengthSurface, pixelLength, 0.1*sideLengthSurface, 0)
 
-tip = subRoutines.generateTip(N_resolutionTip, pixelLength)
+tip = subRoutines.generateTip(N_resolutionTip, pixelLength, typeTip, R_tip, m_tip)
 
 image = mph.grey_dilation(surface, structure=-tip)
 

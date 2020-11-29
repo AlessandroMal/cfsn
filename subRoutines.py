@@ -21,14 +21,17 @@ def generateSurface(N_resolutionSurface, N_dots, sideLengthSurface):
     return z
    
 
-def generateTip(N_resolutionTip, pixelLength):
+def generateTip(N_resolutionTip, pixelLength, typeTip, R, m):
     
     tipSideLength = pixelLength*N_resolutionTip
     
     x = np.linspace(0, tipSideLength, N_resolutionTip) * np.ones([N_resolutionTip, N_resolutionTip])
     y = x.T
     
-    tip = 2*(x - tipSideLength/2)**2 + 2*(y - tipSideLength/2)**2
+    if typeTip == 'parabolic':
+        tip = ((x - tipSideLength/2)**2 + (y - tipSideLength/2)**2)/ (2*R) # t(x) = 1/2 * x²/R
+    if typeTip == 'hyperbolic':
+        tip = 1/ m * np.sqrt(R**2/m**2 + (x - tipSideLength/2)**2 + (y - tipSideLength/2)**2) - R/ m**2 # t(x) = 1/m * sqrt(R²/m² + x²) - R/m²
 
     return tip
 
