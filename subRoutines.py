@@ -61,14 +61,15 @@ def genUnifSph(N_res, N_dots, l_side, pixelLength,  rmin, rmax):
     return z
 
 
-def genNormSph(N_res, N_dots, l_side, pixelLength, av, var):
+def genNormSph(N_res, N_dots, l_side, pixelLength, av, var, seperateDots=True):
 #come prima ma raggi con distribuzione normale
 #Alessandro
+    R = []
     
-    while 1>0:
-        R = np.random.normal(av, var)
-        if R>0:
-            break
+    while len(R)<N_dots:
+        R_new = np.random.normal(av, var)
+        if R_new>0:
+            R.append(R_new)
 #uso una tecnica di rigetto per evitare R negativi se metto
 #media e varianza pericolose
 #Ale
@@ -83,7 +84,7 @@ def genNormSph(N_res, N_dots, l_side, pixelLength, av, var):
         
         validPoint = True
         for j in range(len(x0)):
-            if np.sqrt((x0_new - x0[j])**2 + (y0_new - y0[j])**2) < 3*R: # SPECIFY DEGREE OF SEPERATION
+            if np.sqrt((x0_new - x0[j])**2 + (y0_new - y0[j])**2) < 4*(av + 3*var) and seperateDots==True: # SPECIFY DEGREE OF SEPERATION
                 validPoint=False
         
         if validPoint == True:
@@ -99,8 +100,8 @@ def genNormSph(N_res, N_dots, l_side, pixelLength, av, var):
         
         for x in range(N_res):
             for y in range(N_res):
-                if R**2 - (x*pixelLength - x0[i])**2 - (y*pixelLength - y0[i])**2>0:
-                    dot[x,y] += np.sqrt(R**2 - (x*pixelLength - x0[i])**2 - (y*pixelLength - y0[i])**2) + R
+                if R[i]**2 - (x*pixelLength - x0[i])**2 - (y*pixelLength - y0[i])**2>0:
+                    dot[x,y] += np.sqrt(R[i]**2 - (x*pixelLength - x0[i])**2 - (y*pixelLength - y0[i])**2) + R[i]
             
         z = z + dot
         

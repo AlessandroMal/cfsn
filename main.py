@@ -65,6 +65,9 @@ for i in plotDict:
     y = x.T
     fig = plt.figure()
     ax= fig.gca(projection='3d')
+    ax.set_xlabel('x [a.u.]')
+    ax.set_ylabel('y [a.u.]')
+    ax.set_zlabel('z [a.u.]')
     ax.set_title(i)
     ax.plot_surface(x, y, plotDict[i])
 
