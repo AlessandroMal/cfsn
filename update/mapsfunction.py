@@ -71,7 +71,10 @@ def plotfalsecol(z,pxlen):
     
     plt.pcolormesh(z)
     plt.colorbar()    
-
+    
+    plt.xlabel('X (nm)')
+    plt.ylabel('Y (nm)')
+    
 def genSphere(z,pxlen,centre,R):
     if(len(centre)!=len(R)*2):
         print("input genSphere non validi")
