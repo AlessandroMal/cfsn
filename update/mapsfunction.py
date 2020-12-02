@@ -1,5 +1,6 @@
 import numpy as np
 from random import uniform
+import scipy.ndimage.morphology as mph
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import scipy.ndimage
@@ -219,6 +220,10 @@ def identObj(z, thres):
 
     return obj
 
+def skew(z,pxlen):
+    z_skew = np.mean((z*pxlen - np.mean(z*pxlen))**3/ np.std(z*pxlen)**3)
+    return z_skew
+
 def V(z,pxlen):
     somma=0
     
@@ -242,3 +247,37 @@ def specArea(z,pxlen):
             A+=np.linalg.norm(np.cross(a,b))/2
             
     return A/(pxlen*pxlen*len(z)*len(z))
+
+def calcParams(z,pxlen):
+    params = {'mean': np.mean(z*pxlen),
+              'std': np.std(z*pxlen),
+              'skew': skew(z,pxlen),
+              'V': V(z,pxlen),
+              'specArea': specArea(z,pxlen)}
+    return params
+
+def paramTipDepend(surf, pxlen, tipType, h, aspectratio_min, aspectratio_max, step):
+    aspectratio = np.linspace(aspectratio_min, aspectratio_max, step)
+    
+    surfParams = calcParams(surf,pxlen)
+    imgParams = []
+    
+    for i in aspectratio:
+        tip = globals()[tipType](pxlen,h,i)
+        img = mph.grey_dilation(surf, structure=-tip)
+        
+        imgParams.append(calcParams(img,pxlen))
+    
+    plt.figure()
+    
+    for i in imgParams[0]:
+        param = []
+        for j in range(len(imgParams)):
+            param.append(imgParams[j][i]/ surfParams[i])
+        plt.plot(aspectratio, param, marker='.', label=i)
+        
+    plt.xlabel(r'$aspectratio \propto 1/ R_{tip}$')
+    plt.ylabel('rel. values (image/surface)')
+    plt.grid()   
+    plt.legend()
+ 

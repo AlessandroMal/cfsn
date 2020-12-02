@@ -16,12 +16,10 @@ z=mf.genFlat(Npx)
 #z=mf.genUnifSph(z,pxlen,10,5,10) #, xmin=22, xmax=58, ymin=62, ymax=78)
 #z=mf.genNormSph(z,pxlen,8,15,5) #, xmin=22, xmax=58, ymin=62, ymax=78)
 
-print(mf.specArea(z,pxlen))
+#print(mf.specArea(z,pxlen))
 
 z=mf.genUnifIsolSph(z,pxlen,8,20,20) #, xmin=22, xmax=58, ymin=62, ymax=78)
 #OCCHIO AI DATI IN INPUT PERCHE FUNZIONA A RIGETTO
-
-print(mf.specArea(z,pxlen))
 
 #TIP------------------------------------------------
 
@@ -35,7 +33,7 @@ tip=mf.genParabolicTip(pxlen,80,4) #occhio che h/a>>pxlen
 img = mph.grey_dilation(z, structure=-tip)
 #---------------------------------------------------
 
-print(8*2/3*3.14*20**3+8*3.14*20**3,"  ",mf.V(z,pxlen),"  ",mf.V(img,pxlen))
+#print(8*2/3*3.14*20**3+8*3.14*20**3,"  ",mf.V(z,pxlen),"  ",mf.V(img,pxlen))
 
 #PLOT-----------------------------------------------
 mf.plotview(z,pxlen,30,30)
@@ -50,7 +48,15 @@ mf.plotfalsecol(img,pxlen)
 #mf.plotview(tip,pxlen,90,0)
 #mf.plotview(tip,pxlen,0,90)
 
-#OBJ-----------------------------------------------
+#PARAMS---------------------------------------------
 
-obj = mf.identObj(z,0)
+zParams = mf.calcParams(z,pxlen)
+print('\nSURFACE:\n', zParams)
+imgParams = mf.calcParams(img,pxlen)
+print('\nIMAGE:\n', imgParams)
+
+#mf.paramTipDepend(z, pxlen, 'genParabolicTip', 80, 1, 40, 20)
+
+#obj = mf.identObj(z,0)
 #for i in obj: mf.plotfalsecol(i,pxlen)
+
