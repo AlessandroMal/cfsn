@@ -1,6 +1,9 @@
 import mapsfunction as mf
 import scipy.ndimage.morphology as mph
 import numpy as np
+import matplotlib.pyplot as plt
+
+plt.close('all') #chiude tutte le figure aperte
 
 Npx=300
 pxlen=1 #nm
@@ -46,3 +49,8 @@ mf.plotfalsecol(img,pxlen)
 #mf.plotview(tip,pxlen,30,30)
 #mf.plotview(tip,pxlen,90,0)
 #mf.plotview(tip,pxlen,0,90)
+
+#OBJ-----------------------------------------------
+
+obj = mf.identObj(z,0)
+#for i in obj: mf.plotfalsecol(i,pxlen)

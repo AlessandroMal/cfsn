@@ -2,6 +2,7 @@ import numpy as np
 from random import uniform
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import scipy.ndimage
 
 def genFlat(Npx):
     z = np.zeros([Npx, Npx])
@@ -63,15 +64,16 @@ def plotview(z,pxlen,theta,phi):
 def plotfalsecol(z,pxlen):
     plt.figure()
     #plt.title()
-    #plt.axis('equal')
+    plt.axis('equal')
     
     X = np.linspace(0,pxlen*len(z),num=len(z))
     Y = np.linspace(0,pxlen*len(z),num=len(z))
     X, Y = np.meshgrid(X, Y)
     
     plt.pcolormesh(z)
-    plt.colorbar()    
+    clb = plt.colorbar()    
     
+    clb.set_label('Z (nm)')
     plt.xlabel('X (nm)')
     plt.ylabel('Y (nm)')
     
@@ -125,7 +127,7 @@ def genUnifIsolSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
         
         b=True
         for i in range(int(len(xyr)/3)):
-           if  R+xyr[3*i+2]>np.sqrt((x0-xyr[3*i])**2+(y0-xyr[3*i+1])**2):
+           if R+xyr[3*i+2]>np.sqrt((x0-xyr[3*i])**2+(y0-xyr[3*i+1])**2):
                b=False
         
         if b==True:
@@ -206,6 +208,16 @@ def genSemisphTip(pxlen,h,aspectratio):
                 z[y,x]=R*(1-np.sqrt(1-r2/R**2))
 
     return z
+
+def identObj(z, thres):
+    z_binary = (z>thres) #vero se elemento e piu grande della soglia
+    z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
+    objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    
+    obj = [z[i] for i in objInd]
+    print('\nidentObj ha trovato ' + str(len(obj)) + ' particelle\n')
+
+    return obj
 
 def V(z,pxlen):
     somma=0
