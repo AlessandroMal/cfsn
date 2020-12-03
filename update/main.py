@@ -2,6 +2,7 @@ import mapsfunction as mf
 import scipy.ndimage.morphology as mph
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
 
 plt.close('all') #chiude tutte le figure aperte
 
@@ -12,6 +13,7 @@ pxlen=1 #nm
 
 z=mf.genFlat(Npx)
 #z=mf.genNormNoise(z,pxlen,2,50)
+#z=gaussian_filter(z,10) #z diventa una funziona continua
 #z=mf.genSphere(z,pxlen,np.array([100,100,20,70]),np.array([10,30]))
 #z=mf.genUnifSph(z,pxlen,10,5,10) #, xmin=22, xmax=58, ymin=62, ymax=78)
 #z=mf.genNormSph(z,pxlen,8,15,5) #, xmin=22, xmax=58, ymin=62, ymax=78)
