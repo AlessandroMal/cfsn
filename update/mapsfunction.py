@@ -248,25 +248,32 @@ def specArea(z,pxlen):
             
     return A/(pxlen*pxlen*len(z)*len(z))
 
-def calcParams(z,pxlen):
+def coverage(z, thres):
+    N_tot = len(z)**2
+    N = np.sum(z>thres)
+    cov = N/N_tot
+    return cov
+
+def calcParams(z,pxlen,thres):
     params = {'mean': np.mean(z*pxlen),
               'std': np.std(z*pxlen),
               'skew': skew(z,pxlen),
               'V': V(z,pxlen),
-              'specArea': specArea(z,pxlen)}
+              'specArea': specArea(z,pxlen),
+              'coverage': coverage(z,thres)}
     return params
 
-def paramTipDepend(surf, pxlen, tipType, h, aspectratio_min, aspectratio_max, step):
+def paramTipDepend(surf, pxlen, thres, tipType, h, aspectratio_min, aspectratio_max, step):
     aspectratio = np.linspace(aspectratio_min, aspectratio_max, step)
     
-    surfParams = calcParams(surf,pxlen)
+    surfParams = calcParams(surf,pxlen,thres)
     imgParams = []
     
     for i in aspectratio:
         tip = globals()[tipType](pxlen,h,i)
         img = mph.grey_dilation(surf, structure=-tip)
         
-        imgParams.append(calcParams(img,pxlen))
+        imgParams.append(calcParams(img,pxlen,thres))
     
     plt.figure()
     

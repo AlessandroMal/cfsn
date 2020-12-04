@@ -8,6 +8,10 @@ plt.close('all') #chiude tutte le figure aperte
 
 Npx=300
 pxlen=1 #nm
+Npart=8
+rmin=20 #nm
+rmax=20 #nm
+thres=5 #nm
 
 #MAP-------------------------------------------------
 
@@ -20,7 +24,7 @@ z=mf.genFlat(Npx)
 
 #print(mf.specArea(z,pxlen))
 
-z=mf.genUnifIsolSph(z,pxlen,8,20,20) #, xmin=22, xmax=58, ymin=62, ymax=78)
+z=mf.genUnifIsolSph(z,pxlen,Npart,rmin,rmax) #, xmin=22, xmax=58, ymin=62, ymax=78)
 #OCCHIO AI DATI IN INPUT PERCHE FUNZIONA A RIGETTO
 
 #TIP------------------------------------------------
@@ -52,13 +56,13 @@ mf.plotfalsecol(img,pxlen)
 
 #PARAMS---------------------------------------------
 
-zParams = mf.calcParams(z,pxlen)
+zParams = mf.calcParams(z,pxlen,thres)
 print('\nSURFACE:\n', zParams)
-imgParams = mf.calcParams(img,pxlen)
+imgParams = mf.calcParams(img,pxlen,thres)
 print('\nIMAGE:\n', imgParams)
 
-#mf.paramTipDepend(z, pxlen, 'genParabolicTip', 80, 1, 40, 20)
+#mf.paramTipDepend(z, pxlen, thres, 'genParabolicTip', 80, 0.5, 10, 20)
 
-#obj = mf.identObj(z,0)
+#obj = mf.identObj(img,thres)
 #for i in obj: mf.plotfalsecol(i,pxlen)
 
