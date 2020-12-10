@@ -287,4 +287,43 @@ def paramTipDepend(surf, pxlen, thres, tipType, h, aspectratio_min, aspectratio_
     plt.ylabel('rel. values (image/surface)')
     plt.grid()   
     plt.legend()
+
+def paramDepend(Npx, pxlen, rmin, rmax, N_part_min, N_part_max,
+                tipType, h, aspectratio_min, aspectratio_max, aspectratio_step,
+                N_sample, calcParam, y_label):
+    
+    z = genFlat(Npx)
+    N_part = np.arange(N_part_min, N_part_max+1, 1)
+    aspectratio = np.linspace(aspectratio_min, aspectratio_max, aspectratio_step)
+    
+    plt.figure()
+    plt_colors = [np.random.random(3) for _ in range(len(aspectratio) + 1)] # +1 per la superficie stessa
+    
+    for i in range(N_sample):
+        
+        z_param = []
+        img_param = []
+        
+        for N in N_part:
+            print('N = ', N)
+            z_N = genUnifIsolSph(z,pxlen,N,rmin,rmax)
+            z_param.append(calcParam(z_N*pxlen))
+                
+            for ar in aspectratio:
+                print('ar = ', ar)
+                tip_ar = tipType(pxlen,h,ar)
+                img_ar = mph.grey_dilation(z_N, structure=-tip_ar)
+                img_param.append(calcParam(img_ar*pxlen)) 
+        
+        plt_label = 'surface' if i==0 else '' # visualizza label solo una volta
+        plt.plot(N_part, z_param, marker='.', color=plt_colors[-1], label=plt_label)
+        for j in range(len(aspectratio)):
+            plt_label = 'a.r. = '+str(aspectratio[j])  if i==0 else '' # visualizza label solo una volta
+            plt.plot(N_part, img_param[j::len(aspectratio)], marker='.', color=plt_colors[j], label = plt_label)
+        
+    plt.xlabel(r'$N_{part}$')
+    plt.ylabel(y_label)
+    plt.grid()   
+    plt.legend()
+    plt.tight_layout()
  

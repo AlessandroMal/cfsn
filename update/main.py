@@ -63,6 +63,11 @@ print('\nIMAGE:\n', imgParams)
 
 #mf.paramTipDepend(z, pxlen, thres, 'genParabolicTip', 80, 0.5, 10, 20)
 
+mf.paramDepend(Npx, pxlen, rmin, rmax, 1, 20,
+               mf.genParabolicTip, 80, 0.5, 5, 4,
+               1, lambda surf: mf.V(surf, pxlen), r'$V [nm³]$')
+# calcParam argument deve essere una funzione sola della superficie/image
+
 #obj = mf.identObj(img,thres)
 #for i in obj: mf.plotfalsecol(i,pxlen)
 
