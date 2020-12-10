@@ -1,19 +1,19 @@
 import mapsfunction as mf
 import parameters as par
 import scipy.ndimage.morphology as mph
-#import numpy as np
+import numpy as np
 import matplotlib.pyplot as plt
 #from scipy.ndimage import gaussian_filter
 #import time
 
 plt.close('all') #chiude tutte le figure aperte
 
-Npx=500 #resolution of the map
-pxlen=0.5 #nm, phyisical length of a pixel in the map
-rmin=20 #nm
-rmax=20 #nm
+Npx=300 #resolution of the map
+pxlen=1 #nm, phyisical length of a pixel in the map
+rmin=60 #nm
+rmax=60 #nm
 thres=5 #nm
-Npart=20 #number of particles on the map
+Npart=5 #number of particles on the map
 
 #MAP-------------------------------------------------
 
@@ -81,7 +81,13 @@ print('\nSURFACE:\n', zParams)
 imgParams = par.calcParams(img,pxlen,thres)
 print('\nIMAGE:\n', imgParams)
 
-#par.paramTipDepend(z, pxlen, thres, 'genParabolicTip', 80, 0.5, 10, 5)
+#par.paramvsTip(z, pxlen, thres, mf.genParabolicTip, 80, 0.5, 10, 5)
+#par.paramvsRpart(Npx, pxlen, rmin, rmax, 1, 20,
+#                 mf.genParabolicTip, 80, 0.5, 5, 4,
+#                 1, lambda surf: par.coverage(surf, thres), r'$coverage$')
+#par.paramvsRpart(Npx, pxlen, 1, 64, 10, 5,
+#                 mf.genParabolicTip, 80, 0.5, 5, 4,
+#                 1, lambda surf: par.coverage(surf, thres), r'$coverage$')
 
 #obj = mf.identObj(img,thres)
 #for i in obj: mf.plotfalsecol(i,pxlen)
