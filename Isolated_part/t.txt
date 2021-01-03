@@ -1,0 +1,100 @@
+def paramvsNpart(Npx, pxlen, rmin, rmax, N_part_min, N_part_max,
+                 tipFunc, h, aspectratio_min, aspectratio_max, aspectratio_step,
+                 N_sample, paramFunc, y_label):
+    '''tipFunc deve essere una funzione.
+    paramFunc deve essere una funzione sola della superficie/ dell'immagine.
+    '''
+    
+    z = mf.genFlat(Npx)
+    N_part = np.arange(N_part_min, N_part_max+1, 1)
+    aspectratio = np.linspace(aspectratio_min, aspectratio_max, aspectratio_step)
+    
+    plt.figure()
+    np.random.seed(123)
+    plt_colors = [np.random.random(3) for _ in range(len(aspectratio) + 1)] # +1 per la superficie stessa
+    
+    for i in range(N_sample):
+        print('N_sample = ' + str(i + 1))
+        
+        z_param = []
+        img_param = []
+        
+        for N in N_part:
+            print('N_part = ' + str(N))
+            z_N = mf.genUnifIsolSph(z,pxlen,N,rmin,rmax)
+            z_param.append(paramFunc(z_N*pxlen))
+                
+            for ar in aspectratio:
+                tip_ar = tipFunc(pxlen,h,ar)
+                img_ar = mph.grey_dilation(z_N, structure=-tip_ar)
+                img_param.append(paramFunc(img_ar*pxlen)) 
+        
+        plt_label = 'surface' if i==0 else '' # visualizza label solo una volta
+        plt.plot(N_part, z_param, marker='.', color=plt_colors[-1], label=plt_label)
+        for j in range(len(aspectratio)):
+            plt_label = 'a.r. = '+str(aspectratio[j])  if i==0 else '' # visualizza label solo una volta
+            plt.plot(N_part, img_param[j::len(aspectratio)], marker='.', color=plt_colors[j], label = plt_label)
+        
+    plt.xlabel(r'$N_{part}$')
+    plt.ylabel(y_label)
+    plt.grid()   
+    plt.legend()
+    plt.tight_layout()
+
+def paramvsNpart(Npx, pxlen, rmin, rmax, N_part_min, N_part_max, N_partstep,
+                 tipFunc, h, parname, rtipmin, rtipmax, rtipstep,
+                 N_sample, paramFunc, y_label, err, relative=False):
+    '''tipFunc deve essere una funzione.
+    paramFunc deve essere una funzione sola della superficie/ dell'immagine.
+    '''
+    
+    N_part = np.linspace(N_part_min, N_part_max, N_partstep)
+    Rtip = np.linspace(rtipmin, rtipmax, rtipstep)
+    
+    plt.figure()
+    np.random.seed(123)
+    plt_colors = [np.random.random(3) for _ in range(len(Rtip) + 1)] # +1 per la superficie stessa
+    
+    for i in range(N_sample):
+        print('N_sample = ' + str(i + 1))
+
+        z_param = []
+        img_param = []
+        xyr = []
+        z=mf.genFlat(Npx)
+
+        for N in N_part:
+            print('N_part = ' + str( int(N) ))
+            z, xyr = mf.genUnifIsolSph(z,pxlen,int(N),rmin,rmax, xyr, True)
+        #    mf.plotfalsecol(z,pxlen)
+            z_param.append(paramFunc(z))
+        #    print('max height surface=',h_max(z,10))
+
+            for radius in Rtip:
+                if parname=='angle': tip_ar = tipFunc(pxlen,h,angle=radius)
+                if parname=='r': tip_ar = tipFunc(pxlen,h,r=radius)
+                tip_ar = tipFunc(pxlen,h,r=radius)
+                img_ar = mph.grey_dilation(z, structure=-tip_ar)
+                
+                if relative:
+                    if z_param[-1]==0: img_param.append(0)
+                    else: img_param.append(paramFunc(img_ar)/z_param[-1]) 
+                else: img_param.append(paramFunc(img_ar))
+         #       print('max height image=',h_max(z,10))
+                
+        if not(relative):
+            plt_label = 'surface' if i==0 else '' # visualizza label solo una volta
+            plt.errorbar(N_part/mf.Ncp(pxlen,Npx,(rmin+rmax)/2), z_param, yerr=err*np.array(z_param), color=plt_colors[-1], label=plt_label)
+        for j in range(len(Rtip)):
+            if parname=='r':
+                plt_label = r'$R_{tip}/ \langle R_{part} \rangle=$'+str(2*Rtip[j]/(rmin+rmax))  if i==0 else '' # visualizza label solo una volta
+            if parname=='angle':
+                plt_label = r'$\alpha=$'+str(2*Rtip[j]/(rmin+rmax))  if i==0 else '' # visualizza label solo una volta
+            plt.errorbar(N_part/mf.Ncp(pxlen,Npx,(rmin+rmax)/2), img_param[j::len(Rtip)], yerr=err*np.array(img_param[j::len(Rtip)]), color=plt_colors[j], label = plt_label)
+
+    plt.title(r'$res(L)=$'+str(Npx)+'   ' + r'$res(\langle R_{part} \rangle)=$'+str(round( (rmin+rmax)/2/pxlen ,3)) )
+    plt.xlabel(r'$N_{part}/N_{cp}$')
+    plt.ylabel(y_label)
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
