@@ -5,15 +5,15 @@ import mapsfunction as mf
 
 def skew(z,pxlen):
     std=np.std(z*pxlen)
-    if std!=0: z_skew = np.mean((z*pxlen - np.mean(z*pxlen))**3/ std**3)
+    if std!=0: z_skew = np.mean((z*pxlen - np.mean(z*pxlen))**3)/ std**3
     else: z_skew=0
     return z_skew
 
 def V(z,pxlen):
     somma=0
     
-    for x in range(len(z)):
-        for y in range(len(z)):
+    for x in range(len(z[0,:])):
+        for y in range(len(z[:,0])):
             somma+=z[y,x]
     
     return pxlen*pxlen*somma
@@ -21,8 +21,8 @@ def V(z,pxlen):
 def specArea(z,pxlen):
 #first order specific area
     A=0
-    for x in range(len(z)-1):
-        for y in range(len(z)-1):
+    for x in range(len(z[0,:])-1):
+        for y in range(len(z[:,0])-1):
             A+=pxlen*np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], pxlen]))/2
             A+=pxlen*np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], pxlen]))/2
             '''
@@ -38,19 +38,20 @@ def specArea(z,pxlen):
     return A/( pxlen*(len(z)-1) )**2
 
 def coverage(z, thres):
-    N_tot = len(z)**2
+    N_tot = len(z[0,:])*len(z[:,0])
     N = np.sum(z>thres)
     cov = N/N_tot
     return cov
 
 def calcParams(z,pxlen,thres):
-    params = {'mean': np.mean(z*pxlen),
-              'std': np.std(z*pxlen),
-              'skew': skew(z,pxlen),
-              'V': V(z,pxlen),
-              'specArea': specArea(z,pxlen),
-              'coverage': coverage(z,thres)}
-    return params
+    param_list = [np.max(z*pxlen),
+                  np.mean(z*pxlen),
+                  np.std(z*pxlen),
+                  skew(z,pxlen),
+                  V(z,pxlen),
+                  specArea(z,pxlen),
+                  coverage(z,thres)]
+    return param_list
 
 def paramvsTip(surf, pxlen, thres, tipFunc, h, aspectratio_min, aspectratio_max, aspectratio_step):
     aspectratio = np.linspace(aspectratio_min, aspectratio_max, aspectratio_step)
@@ -129,7 +130,7 @@ def paramvsRpart(Npx, pxlen, R_part_min, R_part_max, R_part_step, N_part,
     paramFunc deve essere una funzione sola della superficie/ dell'immagine.
     '''
     
-    z = mf.genFlat(Npx)
+    #z = mf.genFlat(Npx)
     R_part = np.linspace(R_part_min, R_part_max, R_part_step)
     aspectratio = np.linspace(aspectratio_min, aspectratio_max, aspectratio_step)
     
@@ -145,6 +146,7 @@ def paramvsRpart(Npx, pxlen, R_part_min, R_part_max, R_part_step, N_part,
         
         for R in R_part:
             print('R_part = ' + str(R))
+            z = mf.genFlat(Npx)
             z_N = mf.genUnifIsolSph(z,pxlen,N_part,R,R)
             z_param.append(paramFunc(z_N*pxlen))
                 
@@ -164,3 +166,38 @@ def paramvsRpart(Npx, pxlen, R_part_min, R_part_max, R_part_step, N_part,
     plt.grid()   
     plt.legend()
     plt.tight_layout()
+    
+def singlePartAnalysis(surf, img, pxlen, thres, h_tip, ar_tip, N_part, N_pxl, 
+                        param_string_list, binwidth_list, bin_min_list, bin_max_list):
+    
+    # get single particles 
+    surf_obj_list, surf_labeled = mf.identObj(surf, thres)
+    img_obj_list, img_labeled = mf.identObj(img, thres)
+    mf.plotThres(surf, surf_labeled, pxlen, 'surface (found ' + str(len(surf_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm)')
+    mf.plotThres(img, img_labeled, pxlen, 'image (found ' + str(len(img_obj_list)) + ' of ' + str(N_part) +' particles, thres=' + str(thres)+'nm)')
+
+    surf_param_list = [calcParams(obj_i, pxlen, thres) for obj_i in surf_obj_list]
+    img_param_list = [calcParams(obj_i, pxlen, thres) for obj_i in img_obj_list]
+    
+    # plot histograms of parameters
+    N_param = len(surf_param_list[0])
+    for i in range(N_param): # iterate over all parameters (mean, std, etc.)
+        surf_dist = [surf_param_list[j][i] for j in range(len(surf_param_list))]
+        img_dist = [img_param_list[j][i] for j in range(len(img_param_list))]
+        
+        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+        bins = np.arange(min(surf_dist + img_dist), max(surf_dist + img_dist) + binwidth_list[i], binwidth_list[i])
+        ax1.hist(surf_dist, color='b', bins=bins, edgecolor='black', linewidth=2)
+        ax2.hist(img_dist, color='r', bins=bins, edgecolor='black', linewidth=2)
+        ax1.set_xlim(bin_min_list[i], bin_max_list[i])
+        ax2.set_xlim(bin_min_list[i], bin_max_list[i])
+        ax2.set_xlabel(param_string_list[i])
+        ax1.set_ylabel('frequency')
+        ax2.set_ylabel('frequency')
+        ax1.set_title('surface (found ' + str(len(surf_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm)')
+        ax2.set_title('image (found ' + str(len(img_obj_list)) + ' of ' + str(N_part) +' particles, thres=' + str(thres)+'nm)')
+        fig.suptitle(r'$h_{tip}=$' + str(h_tip) + r'$nm,\ a.r.=$' + str(ar_tip) + 
+                     r'$,\ N_{pxl}=$' + str(N_pxl) + r'$,\ l_{px}=$' + str(pxlen) + 
+                     r'$nm,\ thres=$' + str(thres) + r'$nm$')
+    
+    

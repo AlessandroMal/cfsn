@@ -1,7 +1,9 @@
+from operator import index
 import numpy as np
 from random import uniform
 import matplotlib.pyplot as plt
-from matplotlib import cm
+from matplotlib import cm, markers
+import scipy.ndimage.morphology as mph
 import scipy.ndimage
 
 def genFlat(Npx):
@@ -277,12 +279,18 @@ def genSemisphTip(pxlen,h,aspectratio):
 def identObj(z, thres):
     z_binary = (z>thres) #vero se elemento e piu grande della soglia
     z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
-    objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
     
-    obj = [z[i] for i in objInd]
-    print('\nidentObj ha trovato ' + str(len(obj)) + ' particelle\n')
+    obj_list = [z[i] for i in obj_ind]    
 
-    return obj
+    return obj_list, z_labeled
+
+#def optThres(z, prec):
+#    thres = 0
+#    while :
+#        obj_list, z_thres = identObj(z, thres)
+#        N_obj = len(obj_list)
+#        z_mean = np.mean(z_thres)
 
 def plotview(z,pxlen,theta,phi):
     fig = plt.figure()
@@ -317,3 +325,12 @@ def plotfalsecol(z,pxlen):
     clb.set_label('Z (nm)')
     plt.xlabel('X (nm)')
     plt.ylabel('Y (nm)')
+
+def plotThres(z, z_labeled, pxlen, title):
+    plotfalsecol(z, pxlen)
+    for i in  range(1, np.max(z_labeled) + 1):
+        obj_i_edge = (z_labeled==i) & mph.binary_dilation(z_labeled!=i, structure=np.ones([3,3])) # edge is part of structure
+        index_x = np.where(obj_i_edge==1)[1]
+        index_y = np.where(obj_i_edge==1)[0]
+        plt.scatter(index_x*pxlen + pxlen/2, index_y*pxlen + pxlen/2, color='r', s=0.25)
+        plt.title(title)
