@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm, markers
 import scipy.ndimage.morphology as mph
 import scipy.ndimage
+from scipy.stats import lognorm
 
 def genFlat(Npx):
     z = np.zeros([Npx, Npx])
@@ -213,6 +214,40 @@ def genNormSph(z,pxlen,Nsph,av,var, **kwargs):
 #Ale
         while 1>0:
             R = np.random.normal(av, var)
+            if R>0:
+                break
+        
+        x0 = uniform(xmin,xmax)
+        y0 = uniform(ymin,ymax)
+        
+        lwrx=int((x0-R)/pxlen)-1  #ottimizza l'algoritmo, non ciclo su
+        if lwrx<0: lwrx=0         #tutta la mappa, importante se ho
+        uprx=int((x0+R)/pxlen)+1  #alta risoluzione
+        if uprx>len(z): uprx=len(z)
+        lwry=int((y0-R)/pxlen)-1
+        if lwry<0: lwry=0
+        upry=int((y0+R)/pxlen)+1
+        if upry>len(z): upry=len(z)
+        
+        for x in range(lwrx,uprx):
+            for y in range(lwry,upry):
+                if R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2 > 0:
+                    z[y,x]+=np.sqrt(R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2) + R
+
+    return z
+
+def genLogNormSph(z,pxlen,Nsph,av,var, **kwargs):
+    xmin=kwargs.get('xmin',0)
+    ymin=kwargs.get('ymin',0)
+    xmax=kwargs.get('xmax',pxlen*len(z))
+    ymax=kwargs.get('ymax',pxlen*len(z))
+
+    for i in range(Nsph):
+#uso una tecnica di rigetto per evitare R negativi se metto
+#media e varianza pericolose
+#Ale
+        while 1>0:
+            R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
             if R>0:
                 break
         
