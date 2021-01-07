@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 plt.close('all')
 
 mu = 1 # gaussian
-sigma = 0.25 # gaussian
+sigma = 0.5 # gaussian
 
 mean = np.exp(mu + sigma**2 / 2) # lognorm
 std = np.sqrt((np.exp(sigma**2) - 1) * np.exp(2*mu + sigma**2)) # lognorm
