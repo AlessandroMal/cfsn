@@ -1,7 +1,9 @@
 import numpy as np
 import scipy.ndimage.morphology as mph
-import matplotlib.pyplot as plt
+import skimage.measure as sk
 import mapsfunction as mf
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 
 def skew(z,pxlen):
     std=h_std(z,pxlen)
@@ -12,10 +14,10 @@ def skew(z,pxlen):
 def V(z,pxlen):
     somma=0
     
-    for x in range(len(z)):
-        for y in range(len(z)):
+    for x in range(np.shape(z)[1]):
+        for y in range(np.shape(z)[0]):
             somma+=z[y,x]
-    
+    #z ha gia unità fisiche
     return pxlen*pxlen*somma
 
 def specArea(z,pxlen):
@@ -23,9 +25,9 @@ def specArea(z,pxlen):
     A=0
     for x in range(len(z)-1):
         for y in range(len(z)-1):
-            A+=pxlen*np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], pxlen]))/2
-            A+=pxlen*np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], pxlen]))/2
-    return A/( pxlen*(len(z)-1) )**2
+            A+=np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], pxlen]))/2
+            A+=np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], pxlen]))/2
+    return A/(len(z)-1)**2
 
 def coverage(z, thres):
     N_tot = len(z)**2
@@ -69,9 +71,9 @@ def h_max(z,n):
 def calcParams(z,pxlen,thres): 
     params = {'mean': h_av(z,pxlen),
               'std': h_std(z,pxlen),
-              'skew': skew(z,pxlen),
+        #      'skew': skew(z,pxlen),
               'V': V(z,pxlen),
-              'specArea': specArea(z,pxlen),
+         #     'specArea': specArea(z,pxlen),
               'coverage': coverage(z,thres)}
     return params
     
@@ -79,125 +81,170 @@ def paramvsTip(surf, pxlen, thres, tipFunc, h, rtipmin, rtipmax, rtipstep):
     R = np.linspace(rtipmin, rtipmax, rtipstep)
     surfParams = calcParams(surf, pxlen, thres)
     imgParams = []
-    
+ 
+    tippos=str(tipFunc).find('Tip') #costuisco titolo file
+    ind=tippos-1
+    tipname=''
+    while str(tipFunc)[ind]!=' ':
+        ind-=1
+    ind+=4
+    while ind<tippos+3:
+        tipname+=str(tipFunc)[ind]
+        ind+=1
+     
+    out=open('paramvs'+tipname+'.dat', 'w')
     for rtip in R:
+        out.write(str(rtip)+' ')
         tip = tipFunc(pxlen, h, r=rtip)
         img = mph.grey_dilation(surf, structure=-tip)
         imgParams.append(calcParams(img,pxlen,thres))
-        for i in imgParams[0]:
-            imgParams[-1][i]=imgParams[-1][i]/surfParams[i]
         print('progress: ' + str((np.where(R==rtip)[0][0] + 1)/len(R) * 100) + '%')
-        
-    imgParams.append('image val/surface val')
-    Rlist = []
-    Rlist.append(R)
-    Rlist.append(r'$R_{tip}$')
-    return Rlist, imgParams
+    
+    out.write('Rtip (Surface par on last position)\n')
+    for i in imgParams[0]:
+        for el in imgParams:
+            out.write(str(el[i])+' ')
+        out.write(str(surfParams[i])+' ')
+        out.write(i+'\n')
+    out.close()
+    return 'paramvs'+tipname+'.dat'
 
-def paramvsNpart(Npx, pxlen, rmin, rmax, N_part_min, N_part_max,
-                 tipFunc, h, aspectratio_min, aspectratio_max, aspectratio_step,
-                 N_sample, paramFunc, y_label):
+def paramvsNpart(Npx, pxlen, rmin, rmax, N_part_min, N_part_max, N_partstep,
+                 tipFunc, h, tipparname, tipmin, tipmax, tipstep,
+                 N_sample, paramFunc, filename):
     '''tipFunc deve essere una funzione.
     paramFunc deve essere una funzione sola della superficie/ dell'immagine.
     '''
+    N_part = np.linspace(N_part_min, N_part_max, N_partstep)
+    tip = np.linspace(tipmin, tipmax, tipstep)
     
-    z = mf.genFlat(Npx)
-    N_part = np.arange(N_part_min, N_part_max+1, 1)
-    aspectratio = np.linspace(aspectratio_min, aspectratio_max, aspectratio_step)
-    
-    plt.figure()
-    np.random.seed(123)
-    plt_colors = [np.random.random(3) for _ in range(len(aspectratio) + 1)] # +1 per la superficie stessa
-    
+    out=open(filename, 'w')
+    out.write(str(Npx)+' '+str(pxlen)+' '+str((rmax+rmin)/2)+' '+str(h)+' '+str(mf.Ncp(pxlen,Npx,(rmin+rmax)/2))+' ' )
+    out.write('#Npx, pxlen, avR_part, h_tip, Ncp(avR_part)\n')
+    for m in tip:
+        out.write(str(m)+' ')
+    out.write('#tip_'+tipparname+' (rows)\n')
+        
     for i in range(N_sample):
         print('N_sample = ' + str(i + 1))
-        
         z_param = []
         img_param = []
-        
+        xyr = []
+        z=mf.genFlat(Npx)
+
         for N in N_part:
-            print('N_part = ' + str(N))
-            z_N = mf.genUnifIsolSph(z,pxlen,N,rmin,rmax)
-            z_param.append(paramFunc(z_N))
-                
-            for ar in aspectratio:
-                tip_ar = tipFunc(pxlen,h,r=ar)
-                img_ar = mph.grey_dilation(z_N, structure=-tip_ar)
-                img_param.append(paramFunc(img_ar)) 
-        
-        plt_label = 'surface' if i==0 else '' # visualizza label solo una volta
-        plt.plot(N_part, z_param, marker='.', color=plt_colors[-1], label=plt_label)
-        for j in range(len(aspectratio)):
-            plt_label = 'a.r. = '+str(aspectratio[j])  if i==0 else '' # visualizza label solo una volta
-            plt.plot(N_part, img_param[j::len(aspectratio)], marker='.', color=plt_colors[j], label = plt_label)
-        
-    plt.xlabel(r'$N_{part}$')
-    plt.ylabel(y_label)
-    plt.grid()   
-    plt.legend()
-    plt.tight_layout()
+            out.write(str(int(N))+' ')
+            print( 'N_part = ' + str(int(N)) )
+            z, xyr = mf.genUnifIsolSph(z,pxlen,int(N),rmin,rmax, xyr, True)
+      #      mf.plotfalsecol(z,pxlen)
+            z_param.append(paramFunc(z))
+        #    print('max height surface=',h_max(z,10))
 
-    
-def paramvsRpart(Npx, pxlen, R_part_min, R_part_max, R_part_step, N_part,
-                 tipFunc, h, rtipmin, rtipmax, rtipstep,
-                 N_sample, paramFunc, y_label):
+            for m in tip:
+                if tipparname=='angle': tip_ar = tipFunc(pxlen,h,angle=m)
+                if tipparname=='r': tip_ar = tipFunc(pxlen,h,r=m)
+                img_ar = mph.grey_dilation(z, structure=-tip_ar)
+                img_param.append(paramFunc(img_ar))
+         #       print('max height image=',h_max(z,10))
+         
+        out.write('#Npart\n')
+        for j in range(len(N_part)):
+            out.write(str(z_param[j])+' ')
+        out.write('#Surface par\n')
+        
+        for i in range(len(tip)):
+            for j in range(len(N_part)):
+                out.write(str(img_param[i+ j*len(tip)])+' ')
+            out.write('\n')
+        out.write('\n')
+    out.close()
+    print('datas printed in '+filename)
+
+def paramvsRpart(Npx, pxlen, N_part, R_part_min, R_part_max, R_part_step,
+                 tipFunc, h, tipparname, tipmin, tipmax, tipstep,
+                 N_sample, paramFunc, filename):
     '''tipFunc deve essere una funzione.
     paramFunc deve essere una funzione sola della superficie/ dell'immagine.
     '''
-    
-    z = mf.genFlat(Npx)
     R_part = np.linspace(R_part_min, R_part_max, R_part_step)
-    Rtip = np.linspace(rtipmin, rtipmax, rtipstep)
+    tip = np.linspace(tipmin, tipmax, tipstep)
     
-    plt.figure()
-    np.random.seed(123)
-    plt_colors = [np.random.random(3) for _ in range(len(Rtip) + 1)] # +1 per la superficie stessa
+    out=open(filename, 'w')
+    out.write(str(Npx)+' '+str(pxlen)+' '+str(N_part)+' '+str(h)+' ' )
+    out.write('#Npx, pxlen, N_part, h_tip\n')
+    for m in tip:
+        out.write(str(m)+' ')
+    out.write('#tip_'+tipparname+' (rows)\n')
     
     for i in range(N_sample):
         print('N_sample = ' + str(i + 1))
-        
         z_param = []
         img_param = []
-        
-        for R in R_part:
-            print('R_part = ' + str(R), '    Ncp = '+str(mf.Ncp(pxlen,Npx,R)))
-            z_N = mf.genUnifIsolSph(z,pxlen,N_part,R,R)
-            z_param.append(paramFunc(z_N*pxlen))
-                
-            for radius in Rtip:
-                tip_ar = tipFunc(pxlen,h,r=radius)
-                img_ar = mph.grey_dilation(z_N, structure=-tip_ar)
-                img_param.append(paramFunc(img_ar*pxlen)) 
-        
-        plt_label = 'surface' if i==0 else '' # visualizza label solo una volta
-        plt.plot(R_part, z_param, marker='.', color=plt_colors[-1], label=plt_label)
-        for j in range(len(Rtip)):
-            plt_label = r'$R_{tip}=$'+str(Rtip[j])+r'$nm$' if i==0 else '' # visualizza label solo una volta
-            plt.plot(R_part, img_param[j::len(Rtip)], marker='.', color=plt_colors[j], label = plt_label)
-    
-    plt.title(r'$res=$'+str(pxlen)+r'$nm, n=$'+str(N_part/pxlen/Npx)+r'$nm^{-2}$')
-    plt.xlabel(r'$R_{part} [nm]$')
-    plt.ylabel(y_label)
-    plt.grid()   
-    plt.legend()
-    plt.tight_layout()    
 
-def plotParams(x,y):
-    xlabel=x[len(x)-1]
-    x.pop(len(x)-1)
-    ylabel=y[len(y)-1]
-    y.pop(len(y)-1)
+        for rad in R_part:
+            out.write(str(rad)+' ')
+            print( 'R_part = ' + str(rad), '   Ncp = '+str(mf.Ncp(pxlen,Npx,rad)) )
+            z = mf.genUnifIsolSph(mf.genFlat(Npx),pxlen,N_part,rad,rad)
+       #     mf.plotfalsecol(z,pxlen)
+            z_param.append(paramFunc(z))
+        #    print('max height surface=',h_max(z,10))
+
+            for m in tip:
+                if tipparname=='angle': tip_ar = tipFunc(pxlen,h,angle=m)
+                if tipparname=='r': tip_ar = tipFunc(pxlen,h,r=m)
+                img_ar = mph.grey_dilation(z, structure=-tip_ar)
+                img_param.append(paramFunc(img_ar))
+         #       print('max height image=',h_max(z,10))
+        
+        out.write('#Rpart\n')
+        for j in range(len(R_part)):
+            out.write(str(z_param[j])+' ')
+        out.write('#Surface par\n')
+        
+        for i in range(len(tip)):
+            for j in range(len(R_part)):
+                out.write(str(img_param[i+ j*len(tip)])+' ')
+            out.write('\n')
+        out.write('\n')
+    out.close()
+    print('datas printed in '+filename)
+
+def capPar(z,pxlen,thres):
+    h=np.amax(z) #già in unità fisiche l'asse z, come anche V
+    props=sk.regionprops( sk.label(z>thres) )
+    e=props[0].eccentricity #eccentricità
+    a=props[0].equivalent_diameter /2 #raggio equivalente cap
+    return h, a*pxlen, props[0].area *pxlen**2, V(z,pxlen), e
+
+def revimg_filter(obj,pxlen,thres, etol, msqertol, relVtol):
+    filtered=[]
+    listvol=[]
+    h=[]
+    for i in range(len(obj)): #filtro con eccentricità
+        listvol.append(capPar(obj[i],pxlen,thres)[3])
+        h.append(capPar(obj[i],pxlen,thres)[0])
+        if capPar(obj[i],pxlen,thres)[4] < etol: filtered.append(i)
     
-    plt.figure()
+    print('eccentricity_filter ha tenuto',len(filtered),'particelle')
+    logv= np.log10(np.array(listvol))
+    logv= logv.reshape((-1, 1))
+    h = np.array(h)
     
-    for i in y[0]:
-        param = []
-        for j in range(len(y)):
-            param.append(y[j][i])
-        plt.plot(x[0], param, marker='.', label=i)
+    model = LinearRegression().fit(logv, h)
+    h_pred = model.predict(logv)
+    msqer=mean_squared_error(h, h_pred)
     
-#    plt.title()
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid()   
-    plt.legend()
+    regrfiltered=[]
+    for i in filtered: #filtro con regressione h(logV) lineare
+        if abs(h_pred[i] - h[i]) < msqertol*msqer: regrfiltered.append(i)
+        
+    print('linear_regression_filter ha tenuto',len(regrfiltered),'particelle')
+    filtered.clear()
+    for i in regrfiltered: #filtro per broken spike: errore relativo Vcap
+        if 1 - 6*listvol[i]/(np.pi*h[i]**3 + 3*h[i]*capPar(obj[i],pxlen,thres)[2]) < relVtol: filtered.append(i)
+        
+    filtered_obj=[]
+    for i in filtered:
+        filtered_obj.append(obj[i])
+    print('relativeVerr_filter ha tenuto',len(filtered_obj),'particelle')
+    return filtered_obj

@@ -77,36 +77,95 @@ def genUnifSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
 
     return z
 
-def genHexSpikes(z, pxlen, h, ar, d, **kwargs):
-    xmin=kwargs.get('xmin',0)
-    ymin=kwargs.get('ymin',0)
-    xmax=kwargs.get('xmax',pxlen*len(z))
-    ymax=kwargs.get('ymax',pxlen*len(z))
-    
-    R=h/ar/2
-    b=True
+def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kwargs):
+    par=kwargs.get('par','r')
+    if par=='r': R=parmax
+    if par=='angle': R=hmax*np.tan(parmax/2)
+    xmin=kwargs.get('xmin',R)
+    ymin=kwargs.get('ymin',R)
+    xmax=kwargs.get('xmax',pxlen*len(z)-R)
+    ymax=kwargs.get('ymax',pxlen*len(z)-R)
+
+    bol=True
     while xmin<xmax:
-        if b: y0=ymin
-        else: y0=ymin+d/2/pxlen
+        if bol: y0=ymin
+        else: y0=ymin+dist/2
         while y0<ymax:
-            lwrx=int((xmin-R)/pxlen)-1  #ottimizza l'algoritmo, non ciclo su
-            if lwrx<0: lwrx=0            #tutta la mappa, importante se ho
-            uprx=int((xmin+R)/pxlen)+1  #alta risoluzione
-            if uprx>len(z): uprx=len(z)
-            lwry=int((y0-R)/pxlen)-1
-            if lwry<0: lwry=0
-            upry=int((y0+R)/pxlen)+1
-            if upry>len(z): upry=len(z)
-        
-            for x in range(lwrx,uprx):
-                for y in range(lwry,upry):
-                    if R**2 - (x*pxlen - xmin)**2 - (y*pxlen - y0)**2 > 0:
-                        z[y,x]+=2*ar*(R-np.sqrt( (x*pxlen - xmin)**2 + (y*pxlen - y0)**2))
             
-            y0+=d/pxlen
-        xmin+=d*np.sqrt(3)/2/pxlen
-        b=not(b)
-    
+            h=uniform(hmin, hmax)
+            if par=='r': R=uniform(parmin, parmax)
+            if par=='angle': R=h*np.tan(uniform(parmin, parmax)/2)
+            e=uniform(0,emax)
+            if uniform(0,1)>0.5:
+                r=R*np.sqrt(1-e**2)
+            else:
+                r=R
+                R=r*np.sqrt(1-e**2)
+            coeff2=r/R #calcolo coefficiente per altezza spike con base ellittica
+            
+            lwrx=int((xmin-max(R,r))/pxlen)-1  #ottimizza l'algoritmo, non ciclo su
+            if lwrx<0: lwrx=0            #tutta la mappa, importante se ho
+            uprx=int((xmin+max(R,r))/pxlen)+1  #alta risoluzione
+            if uprx>len(z): uprx=len(z)
+            lwry=int((y0-max(R,r))/pxlen)-1
+            if lwry<0: lwry=0
+            upry=int((y0+max(R,r))/pxlen)+1
+            if upry>len(z): upry=len(z)
+            
+            if uniform(0,1)>pbroken: #spike non rotta
+                for x in range(lwrx,uprx):
+                    for y in range(lwry,upry):
+                         if ((x*pxlen-xmin)/R)**2 + ((y*pxlen-y0)/r)**2 <1:
+                            if x*pxlen-xmin!=0:
+                                coeff1=(y*pxlen-y0)/(x*pxlen-xmin)
+                                x_ell=xmin + r/np.sqrt(coeff1**2 + coeff2**2)
+                                y_ell=y0 + coeff1*(x_ell-xmin)
+                            else:
+                                x_ell=xmin
+                                y_ell=y0 + r
+                                
+                            z[y,x]+=h*(1 - np.sqrt( ((x*pxlen-xmin)**2+(y*pxlen-y0)**2)/((x_ell-xmin)**2+(y_ell-y0)**2)  ) )
+            
+            else: #spike rotta
+                p=[]
+                for i in range(3): #prendo 3 punti (centro in 0)
+                    xrnd=xmin+R #rejection method for point in the ellipse
+                    yrnd=y0+r
+                    x_ell = xmin
+                    y_ell = y0
+                    
+                    while (xrnd-xmin)**2+(yrnd-y0)**2> (x_ell-xmin)**2+(y_ell-y0)**2:
+                        xrnd=uniform(xmin-R,xmin+R)
+                        yrnd=uniform(y0-r  ,y0+r)
+                        if x*pxlen-xmin!=0:
+                            coeff1=(yrnd-y0)/(xrnd-xmin)
+                            x_ell=xmin + r/np.sqrt(coeff1**2 + coeff2**2)
+                            y_ell=y0 + coeff1*(x_ell-xmin)
+                        else:
+                            x_ell=xmin
+                            y_ell=y0 + r
+
+                    p.append(xrnd)
+                    p.append(yrnd)
+                    p.append(h*(1 - np.sqrt( ((x*pxlen-xmin)**2+(y*pxlen-y0)**2)/((x_ell-xmin)**2+(y_ell-y0)**2)  ) ))
+                a=(p[4]-p[1])*(p[8]-p[2])-(p[5]-p[2])*(p[7]-p[1]) #build plane
+                b=-(p[3]-p[0])*(p[8]-p[2])+(p[5]-p[2])*(p[6]-p[0])
+                c=(p[3]-p[0])*(p[7]-p[1])-(p[4]-p[1])*(p[6]-p[0])
+                d=-(a*p[0]+b*p[1]+c*p[2])
+                p.clear()
+                for x in range(lwrx,uprx):
+                    for y in range(lwry,upry):
+                       if ((x*pxlen-xmin)/R)**2 + ((y*pxlen-y0)/r)**2 <1:
+                            coeff1=(y*pxlen-y0)/(x*pxlen-xmin)
+                            if x*pxlen>xmin: x_ell=xmin + r/np.sqrt(coeff1**2 + coeff2**2)
+                            else: x_ell=xmin - r/np.sqrt(coeff1**2 + coeff2**2)
+                            y_ell=y0 + coeff1*(x_ell-xmin)
+                            if -(a*x*pxlen+b*y*pxlen+d)/c>0:
+                                z[y,x]+=min(h*(1 - np.sqrt( ((x*pxlen-xmin)**2+(y*pxlen-y0)**2)/((x_ell-xmin)**2+(y_ell-y0)**2)  ) ), -(a*x*pxlen+b*y*pxlen+d)/c)
+
+            y0+=dist
+        xmin+=dist*np.sqrt(3)/2
+        bol=not(bol)
     return z
 
 def Ncp(pxlen,Npx,r):
@@ -114,7 +173,7 @@ def Ncp(pxlen,Npx,r):
     d=2*r
     lin= int( pxlen*Npx/d +1)*2
     col= int( pxlen*Npx/(2*d*np.cos(np.pi/6)) ) +1
-    if pxlen*Npx%d < d/2: l=l-1 #tolgo l'estremo se non c'è spazio
+    if pxlen*Npx%d < d/2: lin=lin-1 #tolgo l'estremo se non c'è spazio
     if pxlen*Npx%(2*d*np.cos(np.pi/6) ) < d*np.cos(np.pi/6): extraline=int(lin/2)
     return lin*col-extraline
 
@@ -128,7 +187,7 @@ def genUnifIsolSph(z,pxlen,Nsph,rmin,rmax, xyr=[], centres=False, **kwargs):
     if Nsph>=ncp:
         print("Error: too many particles for this map")
         return 0
-        
+
     n=len(xyr)/3
     while n<Nsph:
         if n<0.5*ncp:
@@ -203,7 +262,9 @@ def genUnifIsolSph(z,pxlen,Nsph,rmin,rmax, xyr=[], centres=False, **kwargs):
 
     if n!=Nsph: print("space over: ",n," particles generated")
     if centres: return z, xyr
-    else: return z
+    else:
+        xyr.clear()
+        return z
 
 
 def genNormSph(z,pxlen,Nsph,av,var, **kwargs):
@@ -263,6 +324,7 @@ def genParabolicTip(pxlen,h, **kwargs):
             a=1/2/r
     
     px=int(l/pxlen)
+    if px<10: print('Warning: low tip resolution')
     z=np.zeros([px,px])
     for x in range(len(z)):
         for y in range(len(z)):
@@ -296,6 +358,7 @@ def genPyramidTip(pxlen,h, **kwargs):
         m=2*h/l
     
     px=int(l/pxlen)
+    if px<10: print('Warning: low tip resolution')
     z=np.zeros([px,px])
     for x in range(len(z)):
         for y in range(len(z)):
@@ -320,6 +383,7 @@ def genSemisphTip(pxlen,h, **kwargs):
         R=r
     
     px=int(l/pxlen)
+    if px<10: print('Warning: low tip resolution')
     z=np.ones([px,px])*h
     for x in range(len(z)):
         for y in range(len(z)):
@@ -342,10 +406,11 @@ def genConeTip(pxlen,h, **kwargs):
         l=r*2
         m=h/r
     else:
-        l=2*h/np.tan(angle/2)
+        l=2*h*np.tan(angle/2)
         m=2*h/l
     
     px=int(l/pxlen)
+    if px<10: print('Warning: low tip resolution')
     z=np.zeros([px,px])
     for x in range(len(z)):
         for y in range(len(z)):
@@ -357,13 +422,28 @@ def genConeTip(pxlen,h, **kwargs):
     z = z -np.amin(z)
     return z
 
+def genRndSemisphTip(pxlen,h,low,up):
+    R=uniform(low, up)
+    print('generated rnd Rtip=',R)
+    px=int(2*R/pxlen)
+    if px<10: print('Warning: low tip resolution')
+    z=np.ones([px,px])*h
+    for x in range(len(z)):
+        for y in range(len(z)):
+            r2= (x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2
+            if r2 < R**2:
+                z[y,x]=R*(1-np.sqrt(1-r2/R**2))
+
+    z = z -np.amin(z)
+    return z
+
 def identObj(z, thres):
     z_binary = (z>thres) #vero se elemento e piu grande della soglia
     z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
     objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
     
     obj = [z[i] for i in objInd]
-    print('\nidentObj ha trovato ' + str(len(obj)) + ' particelle\n')
+    print('identObj ha trovato ' + str(len(obj)) + ' particelle')
 
     return obj
 
@@ -391,8 +471,8 @@ def plotfalsecol(z,pxlen):
     plt.title('res= '+str(pxlen)+'nm')
     plt.axis('equal')
     
-    X = np.linspace(0,pxlen*len(z),num=len(z))
-    Y = np.linspace(0,pxlen*len(z),num=len(z))
+    X = np.linspace(0,pxlen*np.shape(z)[1],num=np.shape(z)[1])
+    Y = np.linspace(0,pxlen*np.shape(z)[0],num=np.shape(z)[0])
     X, Y = np.meshgrid(X, Y)
     
     plt.pcolormesh(X,Y,z)
