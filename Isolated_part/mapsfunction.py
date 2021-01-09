@@ -77,6 +77,66 @@ def genUnifSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
 
     return z
 
+def genUnifSolidSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
+    xmin=kwargs.get('xmin',0)
+    ymin=kwargs.get('ymin',0)
+    xmax=kwargs.get('xmax',pxlen*len(z))
+    ymax=kwargs.get('ymax',pxlen*len(z))
+        
+    for i in range(Nsph):
+        R  = uniform(rmin, rmax)
+        x0 = uniform(xmin, xmax)
+        y0 = uniform(ymin, ymax)
+        
+        lwrx=int((x0-R)/pxlen)-1  #ottimizza l'algoritmo, non ciclo su
+        if lwrx<0: lwrx=0            #tutta la mappa, importante se ho
+        uprx=int((x0+R)/pxlen)+1  #alta risoluzione
+        if uprx>len(z): uprx=len(z)
+        lwry=int((y0-R)/pxlen)-1
+        if lwry<0: lwry=0
+        upry=int((y0+R)/pxlen)+1
+        if upry>len(z): upry=len(z)
+        
+        xtop=int((lwrx+uprx)/2)
+        ytop=int((lwry+upry)/2)
+        ztop=z[ytop,xtop]
+        for x in range(lwrx+1,uprx): #mi appoggio sul punto più alto nel quadrato
+            for y in range(lwry+1,upry): #in cui poggia la sfera
+                if R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2 > 0 and z[y,x] > ztop:
+                    ztop=z[y,x]
+                    xtop=x
+                    ytop=y
+        
+        r_top=np.sqrt((xtop*pxlen-x0)**2+(ytop*pxlen-y0)**2)
+        z0=ztop+np.sqrt(R**2 - r_top**2) #pongo il centro della sfera
+        
+        lwrxcap=int((x0-r_top)/pxlen)-1  #vedo se ci sono appoggi migliori sotto
+        if lwrxcap<0: lwrxcap=0
+        uprxcap=int((x0+r_top)/pxlen)+1
+        if uprxcap>len(z): uprxcap=len(z)
+        lwrycap=int((y0-r_top)/pxlen)-1
+        if lwrycap<0: lwrycap=0
+        uprycap=int((y0+r_top)/pxlen)+1
+        if uprycap>len(z): uprycap=len(z)        
+        
+        r_top=R
+        for x in range(lwrxcap,uprxcap): #trovo contect point
+            for y in range(lwrycap,uprycap):
+                if R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2 > 0 and np.sqrt( (z[y,x]-z0)**2+(x*pxlen-x0)**2+(y*pxlen-y0)**2) <r_top: 
+                    xtop=x
+                    ytop=y
+                    r_top=np.sqrt( (z[y,x]-z0)**2+(x*pxlen-x0)**2+(y*pxlen-y0)**2)
+        
+        r_top=np.sqrt((xtop*pxlen-x0)**2+(ytop*pxlen-y0)**2)
+        z0=z[ytop,xtop]- (R - np.sqrt(R**2 - r_top**2)) #punto piu basso della nuova sfera
+    
+        for x in range(lwrx,uprx): #finalemente deposito
+            for y in range(lwry,upry):
+                if R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2 > 0:
+                    z[y,x]=z0 + np.sqrt(R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2) + R
+
+    return z
+
 def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kwargs):
     par=kwargs.get('par','r')
     if par=='r': R=parmax

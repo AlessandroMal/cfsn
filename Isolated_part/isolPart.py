@@ -15,6 +15,7 @@ rmax=20 #nm
 thres=3 #nm
 Npart=40 #number of particles on the map
 
+'''
 par.paramvsNpart(Npx, pxlen, rmin, rmax, 1, 40, 14,
                  mf.genPyramidTip, 65, 'angle', np.pi/8, np.pi/2, 1,
                  1, lambda surf: par.V(surf, pxlen), 'VvsN.dat')
@@ -46,3 +47,4 @@ par.paramvsNpart(Npx, pxlen, rmin, rmax, 1, 40, 14,
 par.paramvsRpart(Npx, pxlen, 15, 10, 30, 11,
                  mf.genPyramidTip, 65, 'angle', np.pi/8, np.pi/2, 1,
                  1, lambda surf: par.coverage(surf, thres), 'covvsR.dat')
+'''

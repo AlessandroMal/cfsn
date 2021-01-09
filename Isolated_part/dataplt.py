@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from io import StringIO
 
-def dataforplot(filename):
+def dataforplot(filename): #prende i dati dal file per isolated particle
     inpt=open(filename)
     file=inpt.read()
     
