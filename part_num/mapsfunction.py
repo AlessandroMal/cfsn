@@ -112,14 +112,14 @@ def genHexSpikes(z, pxlen, h, aspectratio, d, **kwargs):
     
     return z
 
-def genUnifSolidSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
+def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
     xmin=kwargs.get('xmin',0)
     ymin=kwargs.get('ymin',0)
     xmax=kwargs.get('xmax',pxlen*len(z))
     ymax=kwargs.get('ymax',pxlen*len(z))
         
     for i in range(Nsph):
-        R  = uniform(rmin, rmax)
+        R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
         x0 = uniform(xmin, xmax)
         y0 = uniform(ymin, ymax)
         
@@ -172,7 +172,7 @@ def genUnifSolidSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
 
     return z
 
-def genUnifIsolSph(z,pxlen,Nsph,min,max, **kwargs):
+def genUnifIsolSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
     xmin=kwargs.get('xmin',0)
     ymin=kwargs.get('ymin',0)
     xmax=kwargs.get('xmax',pxlen*len(z))
