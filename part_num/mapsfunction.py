@@ -117,9 +117,12 @@ def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
     ymin=kwargs.get('ymin',0)
     xmax=kwargs.get('xmax',pxlen*len(z))
     ymax=kwargs.get('ymax',pxlen*len(z))
-        
+    
+    R_list = []
+    
     for i in range(Nsph):
         R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
+        R_list.append(R)
         x0 = uniform(xmin, xmax)
         y0 = uniform(ymin, ymax)
         
@@ -170,7 +173,7 @@ def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
                 if R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2 > 0:
                     z[y,x]=z0 + np.sqrt(R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2) + R
 
-    return z
+    return z, np.array(R_list)
 
 def genUnifIsolSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
     xmin=kwargs.get('xmin',0)
