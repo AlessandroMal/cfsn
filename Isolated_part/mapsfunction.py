@@ -384,20 +384,16 @@ def genParabolicTip(pxlen,h, **kwargs):
             a=1/2/r
     
     px=int(l/pxlen)
-    if px<10: print('Warning: low tip resolution')
+ #   if px<10: print('Warning: low tip resolution')
     z=np.zeros([px,px])
     for x in range(len(z)):
         for y in range(len(z)):
-            if (l/2)**2 - (x*pxlen - px/2*pxlen)**2 - (y*pxlen - px/2*pxlen)**2 > 0:
-                z[y,x]=a*((x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2)
-            else:
-                z[y,x]=h
+            z[y,x]=a*((x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2)
 
     z = z -np.amin(z)
     return z
         
 def genPyramidTip(pxlen,h, **kwargs):
-    #OCCHIO: PER AVERE UNA BUONA FIGURA MI SERVE l>>pxlen
     ar=kwargs.get('ar',-1)
     sideangle=kwargs.get('angle',-1)
     r=kwargs.get('r',-1)
@@ -418,7 +414,6 @@ def genPyramidTip(pxlen,h, **kwargs):
         m=2*h/l
     
     px=int(l/pxlen)
-    if px<10: print('Warning: low tip resolution')
     z=np.zeros([px,px])
     for x in range(len(z)):
         for y in range(len(z)):
@@ -436,15 +431,18 @@ def genSemisphTip(pxlen,h, **kwargs):
         print('Error: tip parameters conflict: used ar')
     
     if ar>0:
-        l=h/ar
-        R=l/2
+        R=h/ar/2
+        if h<R: l=2*np.sqrt(R**2 - (R-h)**2)
+        else: l=h/ar
     else:
-        l=2*r
         R=r
+        if h<R: l=2*np.sqrt(R**2 - (R-h)**2)
+        else: l=2*r
     
     px=int(l/pxlen)
-    if px<10: print('Warning: low tip resolution')
-    z=np.ones([px,px])*h
+    if R*2/pxlen<10: print('Warning: low tip resolution')
+    if h<R: z=np.ones([px,px])*R
+    else: z=np.ones([px,px])*h
     for x in range(len(z)):
         for y in range(len(z)):
             r2= (x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2
@@ -470,24 +468,27 @@ def genConeTip(pxlen,h, **kwargs):
         m=2*h/l
     
     px=int(l/pxlen)
-    if px<10: print('Warning: low tip resolution')
     z=np.zeros([px,px])
     for x in range(len(z)):
         for y in range(len(z)):
-            if (l/2)**2 - (x*pxlen - px/2*pxlen)**2 - (y*pxlen - px/2*pxlen)**2 > 0:
-                z[y,x]+=m*np.sqrt( (x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2)
-            else:
-                z[y,x]=h
+            z[y,x]+=m*np.sqrt( (x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2)
 
     z = z -np.amin(z)
     return z
 
 def genRndSemisphTip(pxlen,h,low,up):
     R=uniform(low, up)
-    print('generated rnd Rtip=',R)
-    px=int(2*R/pxlen)
-    if px<10: print('Warning: low tip resolution')
-    z=np.ones([px,px])*h
+    print('generated rnd Rtip:',R)
+    if h<R:
+        l=2*np.sqrt(R**2 - (R-h)**2)
+        px=int(l/pxlen)
+        z=np.ones([px,px])*R
+    else:
+        l=2*R
+        px=int(l/pxlen)
+        z=np.ones([px,px])*h
+    if R*2/pxlen<10: print('Warning: low tip resolution')
+    print('npx tip:',px)
     for x in range(len(z)):
         for y in range(len(z)):
             r2= (x*pxlen - px/2*pxlen)**2 + (y*pxlen - px/2*pxlen)**2

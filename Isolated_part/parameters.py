@@ -23,22 +23,22 @@ def V(z,pxlen):
 def specArea(z,pxlen):
 #first order specific area
     A=0
-    for x in range(len(z)-1):
-        for y in range(len(z)-1):
+    for x in range(np.shape(z)[1]):
+        for y in range(np.shape(z)[0]):
             A+=np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], pxlen]))/2
             A+=np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], pxlen]))/2
     return A/(len(z)-1)**2
 
 def coverage(z, thres):
-    N_tot = len(z)**2
+    N_tot = np.shape(z)[1]*np.shape(z)[0]
     N = np.sum(z>thres)
     cov = N/N_tot
     return cov
 
 def h_av(z,pxlen):
     summ=0
-    for x in range(len(z)-1):
-        for y in range(len(z)-1):
+    for x in range(np.shape(z)[1]):
+        for y in range(np.shape(z)[0]):
             summ+=z[y][x]
     return summ/len(z)**2
 
