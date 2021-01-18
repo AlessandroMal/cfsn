@@ -5,6 +5,90 @@ Created on Mon Jan  4 14:09:37 2021
 @author: alego
 """
 
+def VfracDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R_std, V_real=0, loadmap=''): 
+    if loadmap=='':
+        z = mf.genFlat(Npx)
+        N_prec=0
+    else:
+        z = np.loadtxt(loadmap)
+        dotpos=loadmap.find('.')
+        start=dotpos-1
+        for i in range(dotpos-1):
+            if loadmap[start]=='_': break
+            start-=1
+        N_prec=int(loadmap[start+1:dotpos])
+    
+    
+    N_part = np.linspace(np.log10(N_part_min), np.log10(N_part_max), N_part_step)
+    N_part = np.round(10**N_part)
+    N_part.astype(int, copy=False)
+    V_rel_list = []
+    
+    R_mu    = np.log(R_mean / np.sqrt(1 + R_std **2 / R_mean**2))  # recalculated gaussian
+    R_sigma = np.sqrt(np.log(1 + (R_std/R_mean)**2)) # reculaculated gaussian
+    
+    for i in range(step_sim):
+        print('simulation',i+1)
+        for N in N_part:
+            print('N=',str(N)[:len(str(N))-2], '...')
+            z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mean,R_std)
+            if( not(isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')) ): np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='Npx,pxlen,Npart in filename')
+            N_prec=N
+            V_real += np.sum(4/3 * np.pi * R_part_real**3)
+            V_rel_list.append(par.V(z,pxlen)/V_real)
+    
+    V_std=[]
+    for i in range(len(N_part)):
+        if step_sim==1: V_std.append(0)
+        else: V_std.append(np.std(np.array(V_rel_list[i::len(N_part)])))
+        V_rel_list[i]=np.mean(np.array(V_rel_list[i::len(N_part)]))
+    
+    np.savetxt( 'Vap_onVtrueVsN.dat', np.array([np.array(V_rel_list[:len(N_part)]),N_part,np.array(V_std)]),
+              header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(R_mean) + ' ' + str(R_std) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
+              r'$\mu_R$ $\sigma_R$ $R_{mean}$ $R_{std}$ $N_{px}$ $L_{px}$' )
+    print('data saved in file Vap_onVtrueVsN.dat and in folder maps/')
+    
+def GrowthDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R_std, loadmap=''):
+    if loadmap=='':
+        z = mf.genFlat(Npx)
+        N_prec=0
+    else:
+        z = np.loadtxt(loadmap)
+        dotpos=loadmap.find('.')
+        start=dotpos-1
+        for i in range(dotpos-1):
+            if loadmap[start]=='_': break
+            start-=1
+        N_prec=int(loadmap[start+1:dotpos])
+    
+    N_part = np.linspace(np.log10(N_part_min), np.log10(N_part_max), N_part_step)
+    N_part = np.round(10**N_part)
+    N_part.astype(int, copy=False)
+    RMS_list = []
+    
+    R_mu    = np.log(R_mean / np.sqrt(1 + R_std **2 / R_mean**2))  # recalculated gaussian
+    R_sigma = np.sqrt(np.log(1 + (R_std/R_mean)**2)) # reculaculated gaussian
+
+    for i in range(step_sim):
+        print('simulation',i+1)
+        for N in N_part:
+            print('N=',str(N)[:len(str(N))-2], '...')
+            z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mean,R_std)
+            if( not(isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')) ): np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='Npx,pxlen,Npart in filename')
+            N_prec=N
+            RMS_list.append(np.std(z))
+
+    RMS_std=[]
+    for i in range(len(N_part)):
+        if step_sim==1: RMS_std.append(0)
+        else: RMS_std.append(np.std(np.array(RMS_list[i::len(N_part)])))
+        RMS_list[i]=np.mean(np.array(RMS_list[i::len(N_part)]))
+
+    np.savetxt( 'rmsVsN.dat', np.array([np.array(RMS_list[:len(N_part)]),N_part,np.array(RMS_std)]),
+              header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(R_mean) + ' ' + str(R_std) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
+              r'$\mu_R$ $\sigma_R$ $R_{mean}$ $R_{std}$ $N_{px}$ $L_{px}$' )
+    print('data saved in file rmsVsN.dat and in folder maps/')
+
 def paramvsTip(surf, pxlen, thres, tipFunc, h, rtipmin, rtipmax, rtipstep):
     R = np.linspace(rtipmin, rtipmax, rtipstep)
     surfParams = calcParams(surf, pxlen, thres)
