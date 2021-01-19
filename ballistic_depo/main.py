@@ -62,7 +62,7 @@ R_std_real = 10
 # print('R_mean:', R_mean, 'R_std:', R_std, '\nR_mu:', R_mu, 'R_sigma:', R_sigma)
 #print(part_num.partNum(z, pxlen, R_mu_real, R_sigma_real))
 
-part_num.NpartDep(Npx, pxlen, 3, 5, 500, 4, R_mean_real, R_std_real, 'N')
+part_num.partDep(Npx, pxlen, 3, 5, 500, 4, R_mean_real, R_std_real, 'N')
 #part_num.VfracDep(Npx, pxlen, 15, 5, 10000, 30, R_mean_real, R_std_real)
 #part_num.GrowthDep(Npx, pxlen, 15, 5, 10000, 30, R_mean_real, R_std_real)
 # part_num.plotTipDep(z, pxlen, h, R_mu_real, R_sigma_real, Npart)

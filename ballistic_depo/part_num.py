@@ -46,7 +46,7 @@ def partNum(z, pxlen, R_mu, R_sigma):
     
     return N_part, eff_cov
 
-def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R_std, par, firstmap='', usefile=False):
+def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R_std, par, firstmap='', usefile=False, savefile=False):
     N_part = np.linspace(np.log10(N_part_min), np.log10(N_part_max), N_part_step)
     N_part = np.round(10**N_part)
     N_part.astype(int, copy=False)
@@ -90,7 +90,7 @@ def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R
                 print('generating map ...')
                 z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mean,R_std)
                 V_real += np.sum(4/3 * np.pi * R_part_real**3)
-                if( not(isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')) ): np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='V='+str(V_real)+'; Npx,pxlen,Npart in filename')
+                if savefile: np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='V='+str(V_real)+'; Npx,pxlen,Npart in filename')
             N_prec=N
             
             if par=='N' or par=='N_part' or par=='Npart': est_list.append(partNum(z,pxlen,R_mu,R_sigma)[0])
