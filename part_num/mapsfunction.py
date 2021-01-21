@@ -5,12 +5,17 @@ import matplotlib.pyplot as plt
 from matplotlib import cm, markers
 import scipy.ndimage.morphology as mph
 import scipy.ndimage
-from scipy.stats import lognorm
+from scipy.stats import lognorm, norm
 
 def genFlat(Npx):
     z = np.zeros([Npx, Npx])
     return z
 
+def genNoise(z, Npx, mu, sigma):
+    noise = norm.rvs(mu, sigma, [Npx, Npx])
+    z += noise
+    return z
+    
 
 def genNormNoise(z,pxlen,var,Ltile):
     l=int(Ltile/pxlen)
@@ -299,7 +304,7 @@ def genNormSph(z,pxlen,Nsph,av,var, **kwargs):
 
     return z
 
-def genLogNormSph(z,pxlen,Nsph,av,var, **kwargs):
+def genLogNormSph(z,pxlen,Nsph,mu,sigma, **kwargs):
     xmin=kwargs.get('xmin',0)
     ymin=kwargs.get('ymin',0)
     xmax=kwargs.get('xmax',pxlen*len(z))
@@ -307,7 +312,7 @@ def genLogNormSph(z,pxlen,Nsph,av,var, **kwargs):
 
     for i in range(Nsph):
 
-        R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
+        R = np.random.lognormal(mu, sigma)
         
         x0 = uniform(xmin,xmax)
         y0 = uniform(ymin,ymax)
@@ -328,7 +333,7 @@ def genLogNormSph(z,pxlen,Nsph,av,var, **kwargs):
 
     return z
 
-def genIsolLogNormSph(z,pxlen,Nsph,av,var, **kwargs):
+def genIsolLogNormSph(z,pxlen,Nsph,mu,sigma, **kwargs):
     xmin=kwargs.get('xmin',0)
     ymin=kwargs.get('ymin',0)
     xmax=kwargs.get('xmax',pxlen*len(z))
@@ -337,7 +342,7 @@ def genIsolLogNormSph(z,pxlen,Nsph,av,var, **kwargs):
     i = 0
     while i < Nsph:
 
-        R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
+        R = np.random.lognormal(mu,sigma)
 
         x0 = uniform(xmin,xmax)
         y0 = uniform(ymin,ymax)
@@ -528,8 +533,8 @@ def plotfalsecol(z,pxlen):
     X = np.linspace(0,pxlen*len(z),num=len(z))
     Y = np.linspace(0,pxlen*len(z),num=len(z))
     X, Y = np.meshgrid(X, Y)
-    
-    plt.pcolormesh(z)
+
+    plt.pcolormesh(X,Y,z)
     clb = plt.colorbar()    
     
     clb.set_label('Z (nm)')
@@ -542,5 +547,5 @@ def plotThres(z, z_labeled, pxlen, title):
         obj_i_edge = (z_labeled==i) & mph.binary_dilation(z_labeled!=i, structure=np.ones([3,3])) # edge is part of structure
         index_x = np.where(obj_i_edge==1)[1]
         index_y = np.where(obj_i_edge==1)[0]
-        plt.scatter(index_x*pxlen + pxlen/2, index_y*pxlen + pxlen/2, color='r', s=0.25)
+        plt.scatter(index_x*pxlen + 1/2*pxlen, index_y*pxlen + 1/2*pxlen, color='r', s=0.25)
         plt.title(title)
