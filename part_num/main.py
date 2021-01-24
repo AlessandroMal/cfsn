@@ -14,7 +14,7 @@ random.seed(79223)
 
 plt.close('all')  # chiude tutte le figure aperte
 
-Npx = 1000  # resolution of the map
+Npx = 2000  # resolution of the map
 pxlen = 0.25  # nm, phyisical length of a pixel in the map
 thres = 0 # nm
 Npart = 100 # number of particles on the map
