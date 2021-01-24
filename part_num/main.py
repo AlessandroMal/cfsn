@@ -36,7 +36,7 @@ z = mf.genNoise(z, Npx, 0, sigma_noise)
 #z = mf.genLogNormSph(z, pxlen, Npart, R_mean_real, R_std_real)
 #z,R = mf.genLogNormSolidSph(z,pxlen,Npart,R_mean_real, R_std_real)
 
-#z = median_filter(z, 3)
+#z = median_filter(z, 5)
 
 # Tip------------------------------------------------
 # occhio che h/a>>pxlen
@@ -67,7 +67,7 @@ mf.plotfalsecol(img, pxlen)
 # PARTNUM--------------------------------------------
 
 R_median, R_mu, R_sigma = part_num.reconstLogNorm(
-    z, pxlen, r, sigma_noise, thres, Npart, R_median_real, R_mu_real, R_sigma_real)
+    img, pxlen, r, sigma_noise, thres, Npart, R_median_real, R_mu_real, R_sigma_real)
 
 # print('R_mean_real:', R_mean_real, 'R_std_real:', R_std_real,
 #       '\nR_mu_real:', R_mu_real, 'R_sigma_real:', R_sigma_real)

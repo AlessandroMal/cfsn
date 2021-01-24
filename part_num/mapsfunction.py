@@ -6,6 +6,7 @@ from matplotlib import cm, markers
 import scipy.ndimage.morphology as mph
 import scipy.ndimage
 from scipy.stats import lognorm, norm
+import cv2
 
 def genFlat(Npx):
     z = np.zeros([Npx, Npx])
@@ -498,14 +499,27 @@ def identObj(z, thres):
     
     obj_list = [z[i] for i in obj_ind]    
 
-    return obj_list, z_labeled
+    return obj_list, z_labeled, obj_ind
 
-#def optThres(z, prec):
-#    thres = 0
-#    while :
-#        obj_list, z_thres = identObj(z, thres)
-#        N_obj = len(obj_list)
-#        z_mean = np.mean(z_thres)
+def identObj_Laplace(z, thres):
+    z_laplace = cv2.Laplacian(z, cv2.CV_64F)
+    z_laplace_edges = (z_laplace > 0)
+    z_laplace_no_edges = ~z_laplace_edges
+    z_laplace_only_part = ((z > thres) == 1) & (z_laplace_no_edges == 1)
+
+    z_laplace_obj_list, z_laplace_labeled, z_laplace_obj_ind = identObj(z_laplace_only_part, 0)
+    
+    mean_obj_size = np.mean([len(obj_i) for obj_i in z_laplace_obj_list])
+    std_obj_size = np.std([len(obj_i) for obj_i in z_laplace_obj_list])
+    
+    z_obj_list = []
+    for i, j in enumerate(z_laplace_obj_ind):
+        if len(z_laplace_obj_list[i]) > mean_obj_size - 3*std_obj_size:
+            z_obj_list.append(z[j])
+        else:
+            z_laplace_labeled[np.where(z_laplace_labeled == i+1)] = 0
+    
+    return z_obj_list, z_laplace_labeled
 
 def plotview(z,pxlen,theta,phi):
     fig = plt.figure()

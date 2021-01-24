@@ -4,23 +4,19 @@ import parameters as par
 import scipy.ndimage.morphology as mph
 import matplotlib.pyplot as plt
 from scipy.stats import norm, lognorm
-from skimage.feature import peak_local_max
 
 def reconstLogNorm(z, pxlen, R_tip, sigma_noise, thres, N_part, R_median_real, R_mu_real, R_sigma_real):
-    z_obj_list, z_labeled = mf.identObj(z, thres)
-    mf.plotThres(z, z_labeled, pxlen, 'found ' + str(len(z_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm')
+    # z_obj_list, z_labeled, z_obj_ind = mf.identObj(z, thres)
+    # mf.plotThres(z, z_labeled, pxlen, 'found ' + str(len(z_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm')
 
+    z_obj_list, z_labeled = mf.identObj_Laplace(z, thres)
+    mf.plotThres(z, z_labeled, pxlen, 'found ' + str(len(z_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm')
+    
     R_list = np.array([np.max(obj_i)/2 for obj_i in z_obj_list])
-    
-    # R_list_index = peak_local_max(z, min_distance=1)
-    # print(len(R_list_index))
-    # mf.plotfalsecol(z, pxlen)
-    # plt.scatter(pxlen*R_list_index[:,1] + 1/2*pxlen, pxlen*R_list_index[:,0] + 1/2*pxlen, color='red', marker='x')
-    # R_list = z[R_list_index[:,0], R_list_index[:,1]] / 2
-    
+        
     logR_list = np.log(R_list)
     
-    R_mu_fit, R_sigma_fit = norm.fit(logR_list)
+    R_mu_fit, R_sigma_fit = norm.fit(logR_list, loc=R_mu_real, scale=R_sigma_real)
     R_median_fit = np.exp(R_mu_fit)
     
     x = np.linspace(R_mu_fit - 3*R_sigma_fit, R_mu_fit + 3*R_sigma_fit, 1000)
@@ -29,11 +25,11 @@ def reconstLogNorm(z, pxlen, R_tip, sigma_noise, thres, N_part, R_median_real, R
     
     plt.figure()
     plt.hist(logR_list, bins=12, density=True, edgecolor='black', linewidth=2, color='grey', alpha=0.5)
-    plt.plot(x, pdf_fit, color='r', linewidth=3.5, label='empiric distribution (R_mu = {0:.3f}, R_sigma = {1:.3f})'.format(R_mu_fit, R_sigma_fit))
-    plt.plot(x, pdf_real, color='green', linewidth=3.5, label='real distribution (R_mu = {0:.3f}, R_sigma = {1:.3f})'.format(R_mu_real, R_sigma_real))
+    plt.plot(x, pdf_fit, color='r', linewidth=3.5, label='empiric distribution (R_median = {0:.3f}, mu = {1:.3f}, sigma = {2:.3f})'.format(R_median_fit, R_mu_fit, R_sigma_fit))
+    plt.plot(x, pdf_real, color='green', linewidth=3.5, label='real distribution (R_median = {0:.3f}, mu = {1:.3f}, sigma = {2:.3f})'.format(R_median_real, R_mu_real, R_sigma_real))
     plt.xlabel(r'$\ln(R_{part}/nm)$')
     plt.ylabel('frequency')
-    plt.title('gaussian fit to log data, ' + r'$\sigma_{noise} = $' + str(sigma_noise) + ' nm, ' + r'$R_{tip} = $' + str(R_tip) + ' nm')
+    plt.title('gaussian fit, ' + r'$\sigma_{noise} = $' + str(sigma_noise) + ' nm, ' + r'$R_{tip} = $' + str(R_tip) + ' nm, ' + r'$\frac{\mu_{fit} - \mu_{real}}{\mu_{real}} = $' + '{:.3f}'.format((R_mu_fit-R_mu_real)/R_mu_real) + r', $\frac{\sigma_{fit} - \sigma_{real}}{\sigma_{real}} = $' + '{:.3f}'.format((R_sigma_fit-R_sigma_real)/R_sigma_real))
     plt.legend(loc=1)
     plt.tight_layout()
     
@@ -44,8 +40,8 @@ def reconstLogNorm(z, pxlen, R_tip, sigma_noise, thres, N_part, R_median_real, R
     
     plt.figure()
     plt.hist(R_list, bins=12, density=True, edgecolor='black', linewidth=2, color='grey', alpha=0.5)
-    plt.plot(x_log, pdf_log_fit, color='r', linewidth=3.5, label='empiric distribution (R_median = {0:.3f}, R_sigma = {1:.3f})'.format(R_median_fit, R_sigma_fit))
-    plt.plot(x_log, pdf_log_real, color='green', linewidth=3.5, label='real distribution (R_median = {0:.3f}, R_sigma = {1:.3f})'.format(R_median_real, R_sigma_real))
+    plt.plot(x_log, pdf_log_fit, color='r', linewidth=3.5, label='empiric distribution (R_median = {0:.3f}, sigma = {1:.3f})'.format(R_median_fit, R_sigma_fit))
+    plt.plot(x_log, pdf_log_real, color='green', linewidth=3.5, label='real distribution (median = {0:.3f}, sigma = {1:.3f})'.format(R_median_real, R_sigma_real))
     plt.xlabel(r'$R_{part} [nm]$')
     plt.ylabel('frequency')
     plt.title('from fit calculated lognorm, ' + r'$\sigma_{noise} = $' + str(sigma_noise) + ' nm, ' + r'$R_{tip} = $' + str(R_tip) + ' nm')
