@@ -3,34 +3,52 @@ import mapsfunction as mf
 import parameters as par
 import scipy.ndimage.morphology as mph
 import matplotlib.pyplot as plt
+from scipy.stats import norm, lognorm
 
-def reconstLogNorm(z, pxlen, thres, N_part, R_mu_real, R_sigma_real):
-    z_obj_list, z_labeled = mf.identObj(z, thres)
+def reconstLogNorm(z, pxlen, R_tip, sigma_noise, thres, N_part, R_median_real, R_mu_real, R_sigma_real):
+    # z_obj_list, z_labeled, z_obj_ind = mf.identObj(z, thres)
+    # mf.plotThres(z, z_labeled, pxlen, 'found ' + str(len(z_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm')
+
+    z_obj_list, z_labeled = mf.identObj_Laplace(z, thres)
     mf.plotThres(z, z_labeled, pxlen, 'found ' + str(len(z_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm')
     
-    R_list = [(np.max(np.shape(obj_i)))*pxlen/2 for obj_i in z_obj_list]
+    R_list = np.array([np.max(obj_i)/2 for obj_i in z_obj_list])
+        
+    logR_list = np.log(R_list)
     
-    R_mean = np.mean(R_list)
-    R_std = np.std(R_list)
+    R_mu_fit, R_sigma_fit = norm.fit(logR_list, loc=R_mu_real, scale=R_sigma_real)
+    R_median_fit = np.exp(R_mu_fit)
     
-    R_mu = np.log(R_mean / np.sqrt(1 + R_std**2 / R_mean**2)) # recalculated gaussian
-    R_sigma = np.sqrt(np.log(1 + (R_std/R_mean)**2)) # reculaculated gaussian
+    x = np.linspace(R_mu_fit - 3*R_sigma_fit, R_mu_fit + 3*R_sigma_fit, 1000)
+    pdf_fit = norm.pdf(x, R_mu_fit, R_sigma_fit)
+    pdf_real = norm.pdf(x, R_mu_real, R_sigma_real)
     
-    x = np.linspace(R_mean - 3*R_std, R_mean + 3*R_std, 1000)
-    pdf = 1 / (x * R_sigma * np.sqrt(2*np.pi)) * np.exp(-(np.log(x) - R_mu)**2 / (2*R_sigma**2))
-    pdf_real = 1 / (x * R_sigma_real * np.sqrt(2*np.pi)) * np.exp(-(np.log(x) - R_mu_real)**2 / (2*R_sigma_real**2))
+    plt.figure()
+    plt.hist(logR_list, bins=12, density=True, edgecolor='black', linewidth=2, color='grey', alpha=0.5)
+    plt.plot(x, pdf_fit, color='r', linewidth=3.5, label='empiric distribution (R_median = {0:.3f}, mu = {1:.3f}, sigma = {2:.3f})'.format(R_median_fit, R_mu_fit, R_sigma_fit))
+    plt.plot(x, pdf_real, color='green', linewidth=3.5, label='real distribution (R_median = {0:.3f}, mu = {1:.3f}, sigma = {2:.3f})'.format(R_median_real, R_mu_real, R_sigma_real))
+    plt.xlabel(r'$\ln(R_{part}/nm)$')
+    plt.ylabel('frequency')
+    plt.title('gaussian fit, ' + r'$\sigma_{noise} = $' + str(sigma_noise) + ' nm, ' + r'$R_{tip} = $' + str(R_tip) + ' nm, ' + r'$\frac{\mu_{fit} - \mu_{real}}{\mu_{real}} = $' + '{:.3f}'.format((R_mu_fit-R_mu_real)/R_mu_real) + r', $\frac{\sigma_{fit} - \sigma_{real}}{\sigma_{real}} = $' + '{:.3f}'.format((R_sigma_fit-R_sigma_real)/R_sigma_real))
+    plt.legend(loc=1)
+    plt.tight_layout()
+    
+    R_std_fit = np.sqrt((np.exp(R_sigma_fit**2)-1)*np.exp(2*R_mu_fit)*np.exp(R_sigma_fit**2))
+    x_log = np.linspace(R_median_fit - 3*R_std_fit, R_median_fit + 3*R_std_fit, 1000)
+    pdf_log_fit = lognorm.pdf(x_log, scale=R_median_fit, s=R_sigma_fit)
+    pdf_log_real = lognorm.pdf(x_log, scale=R_median_real, s=R_sigma_real)
     
     plt.figure()
     plt.hist(R_list, bins=12, density=True, edgecolor='black', linewidth=2, color='grey', alpha=0.5)
-    plt.plot(x, pdf, color='r', linewidth=3.5, label='empiric distribution (R_mu = {0:.3f}, R_sigma = {1:.3f})'.format(R_mu, R_sigma))
-    plt.plot(x, pdf_real, color='green', linewidth=3.5, label='real distribution (R_mu = {0:.3f}, R_sigma = {1:.3f})'.format(R_mu_real, R_sigma_real))
+    plt.plot(x_log, pdf_log_fit, color='r', linewidth=3.5, label='empiric distribution (R_median = {0:.3f}, sigma = {1:.3f})'.format(R_median_fit, R_sigma_fit))
+    plt.plot(x_log, pdf_log_real, color='green', linewidth=3.5, label='real distribution (median = {0:.3f}, sigma = {1:.3f})'.format(R_median_real, R_sigma_real))
     plt.xlabel(r'$R_{part} [nm]$')
     plt.ylabel('frequency')
-    plt.title('found ' + str(len(z_obj_list)) + ' of ' + str(N_part) + ' particles, thres=' + str(thres)+'nm')
+    plt.title('from fit calculated lognorm, ' + r'$\sigma_{noise} = $' + str(sigma_noise) + ' nm, ' + r'$R_{tip} = $' + str(R_tip) + ' nm')
     plt.legend(loc=1)
     plt.tight_layout()
 
-    return R_mean, R_std, R_mu, R_sigma
+    return R_median_fit, R_mu_fit, R_sigma_fit
     
 def partNum(z, pxlen, R_mu, R_sigma):
     A = len(z)**2 * pxlen**2
