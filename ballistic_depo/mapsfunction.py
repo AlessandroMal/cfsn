@@ -119,19 +119,63 @@ def genUnifSolidSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
 
     return z
 
-def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
+def genLogNormSolidSph(z,pxlen,Nsph,mu,sigma, **kwargs):
+    xmin=kwargs.get('xmin',0)
+    ymin=kwargs.get('ymin',0)
+    xmax=kwargs.get('xmax',pxlen*len(z))
+    ymax=kwargs.get('ymax',pxlen*len(z))
+
+    R_list = []
+    for i in range(Nsph):
+        R = np.random.lognormal(mu, sigma)
+        R_list.append(R)
+        x0 = uniform(xmin, xmax)
+        y0 = uniform(ymin, ymax)
+
+        lwrx=int((x0-R)/pxlen)-1  #ottimizza l'algoritmo, non ciclo su
+        if lwrx<0: lwrx=0            #tutta la mappa, importante se ho
+        uprx=int((x0+R)/pxlen)+2  #alta risoluzione
+        if uprx>len(z): uprx=len(z)
+        lwry=int((y0-R)/pxlen)-1
+        if lwry<0: lwry=0
+        upry=int((y0+R)/pxlen)+2
+        if upry>len(z): upry=len(z)
+
+        z0=np.amax(z[lwry:upry , lwrx:uprx])
+        d_min= z0 - z[int(y0/pxlen),int(x0/pxlen)] + R
+
+        for x in range(lwrx,uprx):
+            for y in range(lwry,upry):
+                r2= (x*pxlen - x0)**2 + (y*pxlen - y0)**2
+                if r2 < R**2:
+                    d=z0 + R*(1-np.sqrt(1-r2/R**2)) - z[y,x]
+                    if d < d_min:
+                        x_contact=x
+                        y_contact=y
+                        d_min=d
+                        r2_contact=r2
+        z0=z[y_contact,x_contact] - (R - np.sqrt(R**2 - r2_contact)) #punto piu basso della nuova sfera
+        for x in range(lwrx,uprx): #deposito
+            for y in range(lwry,upry):
+                if R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2 > 0:
+                    z[y,x]=z0 + np.sqrt(R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2) + R
+
+    return z, np.array(R_list)
+
+''' not usable now
+def genLogNormSolidSph_gauss(z,pxlen,Nsph, med, std_norm, std_prof, **kwargs):
     xmin=kwargs.get('xmin',0)
     ymin=kwargs.get('ymin',0)
     xmax=kwargs.get('xmax',pxlen*len(z))
     ymax=kwargs.get('ymax',pxlen*len(z))
     
     R_list = []
-    
+    mu= np.log(med)
     for i in range(Nsph):
-        R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
+        R = np.random.lognormal(mu, std_norm)
         R_list.append(R)
-        x0 = uniform(xmin, xmax)
-        y0 = uniform(ymin, ymax)
+        x0 = np.random.normal( (xmax-xmin)/2, std_prof)
+        y0 = np.random.normal( (ymax-ymin)/2, std_prof)
         
         lwrx=int((x0-R)/pxlen)-1  #ottimizza l'algoritmo, non ciclo su
         if lwrx<0: lwrx=0            #tutta la mappa, importante se ho
@@ -163,6 +207,7 @@ def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
                     z[y,x]=z0 + np.sqrt(R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2) + R
 
     return z, np.array(R_list)
+'''
 
 def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kwargs):
     par=kwargs.get('par','r')

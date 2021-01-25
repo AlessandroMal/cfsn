@@ -3,83 +3,56 @@ import parameters as par
 import scipy.ndimage.morphology as mph
 import numpy as np
 import matplotlib.pyplot as plt
-#from scipy.ndimage import gaussian_filter
 #import time
 
 plt.close('all') #chiude tutte le figure aperte
 #probabilmente devo avere Npxtip<280 circa (16gb ram con 25% circa occupato)
 #278 funziona, 296 no
+Npx=3000 #resolution of the map
+pxlen=1 #nm, phyisical length of a pixel in the map
+thres=0 #nm
+s=1 #scaling factor to eventually avoid memory error (dilation)
 
-def volsphere(R): return 5/3*np.pi*R**3
-def volsemisph(R): return 2/3*np.pi*R**3
+rtip=36
+r_part_min=s*12
+r_part_max=s*108
 
-filename='conv_sphere.dat'
-L=100 #lato mappa
-q=1.3/10 #rapporto raggio/lato
-Npx=np.linspace(60,400,8)
+htip=r_part_max*2*1.02
 
-pxlen=L/Npx
-thres=0 #soglia
-#-----------------------------------------------
-R=q*L
-htip=2*R*1.02
-R_tip=np.linspace(R/5,3*R, 8)
+h_arr =np.array([])
+r_arr =np.array([])
+A_arr =np.array([])
+V_arr =np.array([])
+dV_arr=np.array([])
 
-V_red_dil = []
-height = []
-profiles = []
-posmax = []
+posmax=np.array([])
+profiles=[]
+height=[]
 
-z=mf.genFlat(int(Npx[-1]))
-z=mf.genSphere(z,pxlen[-1],np.array([L/2, L/2]),np.array([R]))
-obj = mf.identObj(z,thres)[0]
-V_red_calc= par.V(obj, pxlen[-1]) / volsphere(R)
+dist=2*(rtip + r_part_max)
+dist*=np.sqrt(2)*1.0
 
-maxh=0
-posmax.append(0)
-for x in range(np.shape(obj)[0]):
-    height.append(np.amax(obj[0:,x])/R)
-    if maxh<height[-1]:
-        maxh=height[-1]
-        posmax[-1]=x
-profiles.append(np.array(height))
-height.clear()
-
-for rtip in R_tip:
-    for i in range(len(Npx)): #iterazione su risoluzione
-        print('R_tip=', rtip , ' Npx=', int(Npx[i]))
-        z=mf.genFlat(int(Npx[i]))
-        z=mf.genSphere(z,pxlen[i],np.array([L/2, L/2]),np.array([R]))
+z=mf.genFlat(Npx)
+z=mf.genHexCap(z,pxlen,dist,r_part_min,r_part_max, elem='sphere',
+               xmin=dist, xmax=len(z)*pxlen-dist,
+               ymin=dist, ymax=len(z)*pxlen-dist)
         
-        tip=mf.genSemisphTip(pxlen[i],htip,r=rtip)
-        z = mph.grey_dilation(z, structure=-tip)
-        if rtip==R_tip[-1] and i==0: mf.plotfalsecol(z,pxlen[i])
-        obj = mf.identObj(z,thres)[0]
-        V_red_dil.append(par.V(obj, pxlen[i]) / volsphere(R))
+tip=mf.genSemisphTip(pxlen,htip,r=rtip)
+img = mph.grey_dilation(z, structure=-tip)
+mf.plotfalsecol(z,pxlen)
+mf.plotfalsecol(img,pxlen)
+mf.plotfalsecol(tip,pxlen)
+if 2*r_part_max>htip: print('Warning: possible spikes higher than semisphere tip')
+obj = mf.identObj(img,thres)
+for o in obj:
+#       mf.plotfalsecol(o,pxlen)
+    h,r,A,V,e=par.capPar(o,pxlen,thres)
+    h_arr=np.append(h_arr, h)
+    r_arr=np.append(r_arr, r)
+    A_arr=np.append(A_arr, A)
+    V_arr=np.append(V_arr, V)
+    dV_arr=np.append(dV_arr, 1 - 6*V/(np.pi*h**3 + 3*h*A))
         
-        if i==len(Npx)-1:
-            maxh=0
-            posmax.append(0)
-            for x in range(np.shape(obj)[0]):
-                height.append(np.amax(obj[0:,x])/R)
-                if maxh<height[-1]:
-                    maxh=height[-1]
-                    posmax[-1]=x
-            profiles.append(np.array(height))
-            height.clear()
 
-R_tip=np.append(R_tip, R)
-print('printing data in',filename)
-out=open(filename, 'w')
-out.write('r_tip (R_part in last pos): '+str(R_tip)+'\n')
-out.write('Lpx: '+str(pxlen)+'\n')
-out.write('digital map volume: ['+str(np.array(V_red_calc))+']\n')
-out.write('dilation map volume: '+str(np.array(V_red_dil))+'\n')
-out.write('x_surf, surface profile, x dilated, map profile\n')
-out.write(str(pxlen[-1] * (np.arange(0,len(profiles[0])) - posmax[0]) )+'\n')
-out.write(str(profiles[0])+'\n'+'\n')
-R_tip=np.delete(R_tip, -1)
-for i in range(1,len(R_tip)+1):
-    out.write(str(pxlen[-1] * (np.arange(0,len(profiles[i])) - posmax[i]) )+'\n')
-    out.write(str(profiles[i])+'\n'+'\n')
-out.close()
+np.savetxt('sphOnsph.dat', np.array([h_arr, r_arr, A_arr, V_arr, dV_arr]),
+           header='R_tip='+str(rtip)+'; Npx='+str(Npx)+'; pxlen='+str(pxlen)+'\n on rows: h, r, A, V, dV')

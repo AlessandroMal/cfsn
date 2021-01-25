@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from os.path import isfile
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+from scipy.optimize import curve_fit
+from scipy.stats import linregress
 
 def reconstLogNorm(z, pxlen, thres, N_part, R_mu_real, R_sigma_real):
     z_obj_list, z_labeled = mf.identObj(z, thres)
@@ -36,7 +38,7 @@ def reconstLogNorm(z, pxlen, thres, N_part, R_mu_real, R_sigma_real):
     return R_mean, R_std, R_mu, R_sigma
     
 def partNum(z, pxlen, R_mu, R_sigma):
-    A = len(z)**2 * pxlen**2
+    A = (np.shape(z)[1]-1)*(np.shape(z)[0]-1) * pxlen**2
     V = par.V(z, pxlen)
     
     V_mean = 4/3 * np.pi * np.exp(3*R_mu + 3**2*R_sigma**2/2)
@@ -46,16 +48,26 @@ def partNum(z, pxlen, R_mu, R_sigma):
     
     return N_part, eff_cov
 
-def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R_std, par, firstmap='', usefile=False, savefile=False):
+def C_gauss_prof_semilog(lw, L_corr): return -lw[0]/L_corr + 2*np.ln(lw[1])
+def G_gauss_prof(lLw, alfa):
+    l_xy,L,w=lLw
+    return 2*w**2 *( 1-np.exp(- (l_xy/L)**(2*alfa)) )
+
+def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mu, R_sigma, firstmap='', usefile=False, savefile=False):
     N_part = np.linspace(np.log10(N_part_min), np.log10(N_part_max), N_part_step)
     N_part = np.round(10**N_part)
     N_part.astype(int, copy=False)
     
-    R_mu    = np.log(R_mean / np.sqrt(1 + R_std **2 / R_mean**2))  # recalculated gaussian
-    R_sigma = np.sqrt(np.log(1 + (R_std/R_mean)**2)) # reculaculated gaussian
-
-    est_list = []
-    wl_list = []
+    N_est = np.array([])
+    V_est = np.array([])
+    rms_est = np.array([])
+    h_est = np.array([])
+    
+    L_corr_est = np.array([])
+    L_corr_err = np.array([])
+    alfa_est=np.array([])
+    alfa_err=np.array([])
+    
     for i in range(step_sim):
         if firstmap=='': #initialize map
             z = mf.genFlat(Npx)
@@ -77,7 +89,7 @@ def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R
             V_real=float(head[start:head.find(';', start)])
 
         for N in N_part:
-            print('Sim.',i+1,'N=',str(N)[:len(str(N))-2], end=' ')
+            print('Sim.',i+1,'; N=',str(N)[:len(str(N))-2], end=' ')
             if usefile and isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat'):
                 print('map from file ...')
                 z= np.loadtxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
@@ -88,31 +100,56 @@ def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R
                 V_real=float(head[start:head.find(';', start)])
             else:
                 print('generating map ...')
-                z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mean,R_std)
+                z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mu,R_sigma)
                 V_real += np.sum(4/3 * np.pi * R_part_real**3)
                 if savefile: np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='V='+str(V_real)+'; Npx,pxlen,Npart in filename')
             N_prec=N
             
-            if par=='N' or par=='N_part' or par=='Npart': est_list.append(partNum(z,pxlen,R_mu,R_sigma)[0])
-            if par=='V' or par=='V_rel' or par=='V_frac': est_list.append(par.V(z,pxlen)/V_real)
-            if par=='rms' or par=='RMS' or par=='std': est_list.append(np.std(z))
-            wl_list.append(par.wavelength(z,pxlen,'x'))
+            print('computing parameters ...', end=' ')
+            N_est=np.append(N_est, partNum(z,pxlen,R_mu,R_sigma)[0]/N)
+            V_est=np.append(V_est, par.V(z,pxlen)/V_real)
+            rms_est=np.append(rms_est, np.std(z))
+            h_est=np.append(h_est, np.mean(z))
+            
+            print('computing correlations ...')
+            l,C=par.C(z, pxlen, 50)
+            l*=pxlen
+            
+            slope, intrc, r_val, p_val, errlinregr= linregress(l, C)
+            L_corr_est=np.append( L_corr_est, - slope**-1 )
+            L_corr_err=np.append( L_corr_err, errlinregr/slope**2)
+            L_corr_est=np.append(L_corr_est, 1)
+            l,C=par.G(z, pxlen, 50)
+            l*=pxlen
+            
+            Lforfit=np.ones(len(l))*L_corr_est[-1]
+            rmsforfit=np.ones(len(l))*rms_est[-1]
+            opt,cov= curve_fit(G_gauss_prof, (l, Lforfit, rmsforfit), C)
+            alfa_est=np.append(alfa_est, *opt)
+            alfa_err=np.append(alfa_err, *cov[0])
 
-    if par=='N' or par=='N_part' or par=='Npart': filename='N_relVsN_real.dat'
-    if par=='V' or par=='V_rel' or par=='V_frac': filename='V_relVsV_real.dat'
-    if par=='rms' or par=='RMS' or par=='std': filename='rmsVsN_real.dat'
-    err=[]
-    for i in range(len(N_part)):
-        if step_sim==1: err.append(0)
-        else: err.append(np.std(np.array(est_list[i::len(N_part)])))
-        est_list[i]=np.mean(np.array(est_list[i::len(N_part)]))
-        wl_list[i] =np.mean(np.array( wl_list[i::len(N_part)]))
-        
-    np.savetxt( filename, np.array([np.array(est_list[:len(N_part)]),N_part,np.array(err)],np.array(wl_list[:len(N_part)])),
-              header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(R_mean) + ' ' + str(R_std) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
-              r'$\mu_R$ $\sigma_R$ $R_{mean}$ $R_{std}$ $N_{px}$ $L_{px}$'+
-              '\n wavelength on last line')
-    print('data saved in '+ filename +'and in folder maps/')
+    filename=['N_relVsN.dat', 'V_relVsN.dat', 'rmsVsN.dat', 'hVsN.dat', 'L_corrVsN.dat', 'alfaVsN.dat']
+    est=[N_est, V_est, rms_est, h_est, L_corr_est, alfa_est]
+    
+    for j in range(len(est)):
+        if j<4:
+            err=np.array([])
+            for i in range(len(N_part)):
+                if step_sim==1: err=np.append(err, 0)
+                else: err=np.append(err, np.std(est[j][i::len(N_part)]))
+                est[j][i]=np.mean(est[j][i::len(N_part)])
+        else:
+            if j==4: err=L_corr_err
+            if j==5: err=alfa_err
+            for i in range(len(N_part)):
+                est[j][i]=np.mean(est[j][i::len(N_part)])
+                err[i]=   np.mean(err[i::len(N_part)]) /np.sqrt(step_sim -1)
+
+    
+        np.savetxt(filename[j], np.array([ est[j][:len(N_part)], N_part, err ]),
+                   header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
+                   r'$\mu _R$ $\sigma _R$ $N_{px}$ $L_{px}$')
+        print('data saved in '+ filename[j] +' and in folder maps/')
 
 def plotTipDep(z, pxlen, h, R_mu, R_sigma, N_part_real):
     R_tip = np.linspace(0.01, 20, 10)
@@ -141,12 +178,16 @@ def plotpar_fromfile(filename, xlab, ylab, xscale='linear', yscale='linear', a=0
     out.close()
     
     plt.figure()
-    if filename.find('N_rel')!=-1: est=est/Ntrue
+    if filename.find('N_rel')!=-1:
+        est=est/Ntrue
+        err=err/Ntrue
+    print('last value:', est[-1])
     plt.errorbar(Ntrue, est, yerr=err)
     plt.xscale(xscale)
     plt.yscale(yscale)
     plt.xlabel(xlab)
     plt.ylabel(ylab)
+    plt.grid()
     plt.title(name[0]+'='+str(round(param[0], 2))+', '+name[1]+'='+str(round(param[1], 2))+', '+
               name[2]+'='+str(param[2])+', '+name[3]+'='+str(param[3])+', '+name[4]+'='+str(param[4])+', '+
               name[5]+'='+str(param[5]) )
@@ -158,10 +199,23 @@ def plotpar_fromfile(filename, xlab, ylab, xscale='linear', yscale='linear', a=0
                 passedA=True
                 
             if Ntrue[i]>b: break
-            else: b=i
+            else: b_ind=i
         
-        model  = LinearRegression().fit(np.log10(Ntrue[a:b]), np.log10(est[a:b]) )
-        plt.plot(np.log10(Ntrue[a:b]),model.predict(Ntrue[a:b]), color='red')
-        print('coefficient:',model.coef_)
-        print('mean squared error:', mean_squared_error(np.log10(est[a:b]), model.predict(np.log10(Ntrue[a:b]))) )
+        x=Ntrue[a:b_ind].reshape(-1,1)
+        y=  est[a:b_ind].reshape(-1,1)
+        x_log=np.log10(x)
+        y_log=np.log10(y)
+        model  = LinearRegression().fit(x_log,y_log)
+        plt.plot(x,10 ** model.predict(x_log), color='red')
+        print('coefficient:',model.coef_[0][0])
+        print('mean squared error:', mean_squared_error(y_log, model.predict(x_log)) )
+    
+    plt.figure()
+    plt.title('wavelength in direction x')
+    plt.xscale(xscale)
+    plt.yscale(yscale)
+    plt.xlabel(xlab)
+    plt.ylabel(r'$ \lambda _x  [L_{px}] $')
+    plt.plot(Ntrue, wl)
+    plt.grid()
     plt.show()

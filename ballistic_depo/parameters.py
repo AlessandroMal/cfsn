@@ -21,13 +21,13 @@ def V(z,pxlen):
     #z ha gia unità fisiche
     return pxlen*pxlen*somma
 
-def specArea(z,pxlen):
+def specArea(z):
 #first order specific area
     A=0
     for x in range(np.shape(z)[1]):
         for y in range(np.shape(z)[0]):
-            A+=np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], pxlen]))/2
-            A+=np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], pxlen]))/2
+            A+=np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], 1]))/2
+            A+=np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], 1]))/2
     return A/( (np.shape(z)[1]-1)*(np.shape(z)[0]-1) )
 
 def coverage(z, thres):
@@ -50,6 +50,46 @@ def h_max(z,n):
                     top=sorted(top)
     if n%2==0: return (top[int(n/2)]+top[int(n/2)-1])/2
     else: return top[int(n/2)]
+
+def C(z, bin_size, px_cut):
+    r=np.arange(bin_size/2, min(px_cut, np.sqrt(np.shape(z)[1]**2 + np.shape(z)[0]**2)), bin_size)
+    counter=np.zeros(len(r))
+    hh=np.zeros(len(r))
+
+    for x0 in range(np.shape(z)[1]):
+        for y0 in range(np.shape(z)[0]):
+            for x in range(x0, int(min(np.shape(z)[1], px_cut)) ):
+                if x==x0: starty=y0
+                else: starty=0
+                
+                for y in range(starty, int(min(np.shape(z)[0], px_cut)) ):
+                    l=np.sqrt( (x-x0)**2 +(y-y0)**2 )
+                    bin_hist=int(l/bin_size)
+                    if bin_hist<len(r):
+                        counter[bin_hist]+=1
+                        hh[bin_hist]+=z[y0,x0]*z[y,x]
+    
+    return r, hh/counter
+    
+def G(z, bin_size, px_cut):
+    r=np.arange(bin_size/2, min(px_cut, np.sqrt(np.shape(z)[1]**2 + np.shape(z)[0]**2)), bin_size)
+    counter=np.zeros(len(r))
+    hh=np.zeros(len(r))
+    
+    for x0 in range(np.shape(z)[1]):
+        for y0 in range(np.shape(z)[0]):
+            for x in range(x0, int(min(np.shape(z)[1], px_cut)) ):
+                if x==x0: starty=y0
+                else: starty=0
+                
+                for y in range(starty, int(min(np.shape(z)[0], px_cut)) ):
+                    l=np.sqrt( (x-x0)**2 +(y-y0)**2 )
+                    bin_hist=int(l/bin_size)
+                    if bin_hist<len(r):
+                        counter[bin_hist]+=1
+                        hh[bin_hist]+=(z[y0,x0]-z[y,x])**2
+    
+    return r, hh/counter 
 
 def wavelength(z,pxlen,direction):
     if direction=='x': 
@@ -84,8 +124,7 @@ def calcParams(z,pxlen,thres):
                   skew(z),
                   V(z,pxlen),
                   specArea(z,pxlen),
-                  coverage(z,thres),
-                  wavelength(z, pxlen, 'x')]
+                  coverage(z,thres)]
     return param_list
 
 def paramvsTip(surf, pxlen, thres, tipFunc, h, rtipmin, rtipmax, rtipstep):
@@ -225,7 +264,7 @@ def capPar(z,pxlen,thres):
     props=sk.regionprops( sk.label(z>thres) )
     e=props[0].eccentricity #eccentricità
     a=props[0].equivalent_diameter /2 #raggio equivalente cap
-    return h, a*pxlen, props[0].area *pxlen**2, V(z,pxlen), e
+    return h, a*pxlen, props[0].area *pxlen**2, V(z,pxlen), e, sk.label(z>thres)
 
 def revimg_filter(obj,pxlen,thres, etol, msqertol, relVtol):
     filtered=[]

@@ -165,18 +165,20 @@ def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
 
     return z, np.array(R_list)
 
-def genHexCap(z, pxlen, hmin, hmax, dist, rmin, rmax, elem='cap', **kwargs):
+def genHexCap(z, pxlen, dist, rmin, rmax, elem='cap', **kwargs):
     xmin=kwargs.get('xmin',rmax)
     ymin=kwargs.get('ymin',rmax)
     xmax=kwargs.get('xmax',pxlen*len(z)-rmax)
     ymax=kwargs.get('ymax',pxlen*len(z)-rmax)
 
+    counter=0
     bol=True
     while xmin<xmax:
         if bol: y0=ymin
         else: y0=ymin+dist/2
         while y0<ymax:
             R=uniform(rmin, rmax)
+            counter+=1
             
             lwrx=int((xmin-R)/pxlen)-2  #ottimizza l'algoritmo, non ciclo su
             if lwrx<0: lwrx=0         #tutta la mappa, importante se ho
@@ -195,6 +197,7 @@ def genHexCap(z, pxlen, hmin, hmax, dist, rmin, rmax, elem='cap', **kwargs):
             y0+=dist
         xmin+=dist*np.sqrt(3)/2
         bol=not(bol)
+    print(counter, 'particles generated')
     return z
 
 def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kwargs):
