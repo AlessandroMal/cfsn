@@ -2,6 +2,7 @@ import numpy as np
 from random import uniform
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import scipy.ndimage.morphology as mph
 import scipy.ndimage
 
 def genFlat(Npx):
@@ -522,13 +523,13 @@ def identObj(z, thres):
     return obj_list, z_labeled, obj_ind
 '''
 
-def identObj(z, thres):
+def identObj(z, thres, Npx_min):
     z_binary = (z>thres) #vero se elemento e piu grande della soglia
     z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
     obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
-    
+        
     obj_list = []
-    
+    keep_obj_nr = []
     # prevent overlap of single structures
     for i in range(len(obj_ind)):
         z_single_obj = z.copy()
@@ -538,7 +539,26 @@ def identObj(z, thres):
         z_single_obj = z_single_obj[~np.all(z_single_obj == 0, axis=1)]
         z_single_obj = z_single_obj[:, ~np.all(z_single_obj == 0, axis=0)]
         
-        obj_list.append(z_single_obj)
+        # keep only objects with a minimum pixel size
+        if sum(z_single_obj.shape) >= Npx_min:
+            obj_list.append(z_single_obj)
+            keep_obj_nr.append(i)
+    
+    # relabel objects considering only kept objects
+    keep_obj_nr = np.array(keep_obj_nr)
+    i = 0
+    while i < np.max(z_labeled):
+        if i in keep_obj_nr:
+            i += 1
+            continue
+        z_labeled[np.where(z_labeled==i+1)] = 0
+        z_labeled[np.where(z_labeled>i+1)] += -1
+        keep_obj_nr += -1
+        i += 1
+        
+    obj_ind = [obj_ind[i] for i in keep_obj_nr]
+        
+    print('identObj found ' + str(len(obj_list)) + ' objects')   
 
     return obj_list, z_labeled, obj_ind
 
@@ -578,3 +598,12 @@ def plotfalsecol(z,pxlen, figx=0, figy=0):
     plt.xlabel('X (nm)')
     plt.ylabel('Y (nm)')
     plt.show()
+    
+def plotThres(z, z_labeled, pxlen):
+    plotfalsecol(z, pxlen)
+    for i in range(1, int(np.max(z_labeled)) + 1):
+        obj_i_edge = (z_labeled==i) & mph.binary_dilation(z_labeled!=i, structure=np.ones([3,3])) # edge is part of structure
+        index_x = np.where(obj_i_edge==1)[1] + 0.5
+        index_y = np.where(obj_i_edge==1)[0] + 0.5
+        plt.plot(index_x*pxlen, index_y*pxlen, color='r', marker='s', linestyle='None', markersize=2)
+    plt.tight_layout()
