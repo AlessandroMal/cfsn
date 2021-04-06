@@ -5,6 +5,265 @@ Created on Mon Jan  4 14:09:37 2021
 @author: alego
 """
 
+def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mu, R_sigma, firstmap='', usefile=False, savefile=False):
+    N_part = np.linspace(np.log10(N_part_min), np.log10(N_part_max), N_part_step)
+    N_part = np.round(10**N_part)
+    N_part.astype(int, copy=False)
+    
+    N_est = np.array([])
+    V_est = np.array([])
+    rms_est = np.array([])
+    h_est = np.array([])
+    h_top = np.array([])
+    
+#    L_corr_est = np.array([])
+#    L_corr_err = np.array([])
+#    alfa_est=np.array([])
+#    alfa_err=np.array([])
+    
+    C_true=[]
+    G_true=[]
+    C2_true=[]
+    G2_true=[]
+    C_list=[]
+    G_list=[]
+    for i in range(step_sim):
+        if firstmap=='': #initialize map
+            z = mf.genFlat(Npx)
+            N_prec=0
+            V_real=0
+        else:
+            z = np.loadtxt(firstmap)
+            dotpos=firstmap.find('.')
+            start=dotpos-1
+            for i in range(dotpos-1):
+                if firstmap[start]=='_': break
+                start-=1
+            N_prec=int(firstmap[start+1:dotpos])
+            
+            out=open(firstmap)
+            head=out.readline()
+            out.close()
+            start=head.find('V=')+2
+            V_real=float(head[start:head.find(';', start)])
+
+        for N in N_part:
+            print('Sim.',i+1,'; N=',str(N)[:len(str(N))-2], end=' ')
+            if usefile and isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat'):
+                print('map from file ...', end=' ')
+                z= np.loadtxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
+                out=open('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
+                head=out.readline()
+                out.close()
+                start=head.find('V=')+2
+                V_real=float(head[start:head.find(';', start)])
+            else:
+                print('generating map ...', end=' ')
+                z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mu,R_sigma)
+                V_real += np.sum(4/3 * np.pi * R_part_real**3)
+                if savefile: np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='V='+str(V_real)+'; Npx,pxlen,Npart in filename')
+            N_prec=N
+            
+            print('computing parameters ...')
+            N_est=np.append(N_est, partNum(z,pxlen,R_mu,R_sigma)[0]/N)
+            V_est=np.append(V_est, par.V(z,pxlen)/V_real)
+            rms_est=np.append(rms_est, np.std(z))
+            h_est=np.append(h_est, np.mean(z))
+            h_top=np.append(h_top, np.amax(z))
+            
+            #print('computing correlations ...')
+            l,C=par.C_profile(z, 2, 800)
+#            l*=pxlen
+            
+            C_list.append(C)
+            
+#            slope, intrc, r_val, p_val, errlinregr= linregress(l, C)
+#            L_corr_est=np.append( L_corr_est, - slope**-1 )
+#            L_corr_err=np.append( L_corr_err, errlinregr/slope**2)
+#            L_corr_est=np.append(L_corr_est, 1)
+            
+            l,C=par.G_profile(z, 2, 800)
+#            l*=pxlen
+
+            G_list.append(C)
+            
+#            Lforfit=np.ones(len(l))*L_corr_est[-1]
+#            rmsforfit=np.ones(len(l))*rms_est[-1]
+#            opt,cov= curve_fit(G_gauss_prof, (l, Lforfit, rmsforfit), C)
+#            alfa_est=np.append(alfa_est, *opt)
+#            alfa_err=np.append(alfa_err, *cov[0])
+        if i==0: 
+            for el in C_list:
+                C_true.append(el)
+                C2_true.append(el**2)
+            for el in G_list:
+                G_true.append(el)
+                G2_true.append(el**2)
+        else:
+            for i in range(len(C_true)):
+                C_true[i]=C_true[i]+C_list[i]
+                C2_true[i]=C2_true[i]+C_list[i]**2
+            for i in range(len(G_true)):
+                G_true[i]=G_true[i]+G_list[i]
+                G2_true[i]=G2_true[i]+G_list[i]**2
+        C_list.clear()
+        G_list.clear()
+
+    
+
+    filename=['N_relVsN.dat', 'V_relVsN.dat', 'rmsVsN.dat', 'hVsN.dat', 'maxhVsN.dat']
+    est=[N_est, V_est, rms_est, h_est, h_top]
+    
+    for j in range(len(est)):
+      #  if j<4:
+        err=np.array([])
+        for i in range(len(N_part)):
+            if step_sim==1: err=np.append(err, 0)
+            else: err=np.append(err, np.std(est[j][i::len(N_part)]))
+            est[j][i]=np.mean(est[j][i::len(N_part)])
+#        else:
+ #           if j==4: err=L_corr_err
+  #          if j==5: err=alfa_err
+   #         for i in range(len(N_part)):
+    #            est[j][i]=np.mean(est[j][i::len(N_part)])
+     #           err[i]=   np.mean(err[i::len(N_part)]) /np.sqrt(step_sim -1)
+
+    
+        np.savetxt(filename[j], np.array([ est[j][:len(N_part)], N_part, err ]),
+                   header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
+                   r'$\mu _R$ $\sigma _R$ $N_{px}$ $L_{px}$')
+        print('data saved in '+ filename[j] +' and in folder maps/')
+    
+    C_true=np.array(C_true)/step_sim
+    G_true=np.array(G_true)/step_sim
+    C2_true=np.array(C2_true)/step_sim - C_true**2
+    G2_true=np.array(G2_true)/step_sim - G_true**2
+    np.savetxt('correlations.dat', np.array([ l*pxlen, C_true, G_true, C2_true, G2_true]), fmt='%s')
+   
+
+
+def identObj(z, thres):
+    z_binary = (z>thres) #vero se elemento e piu grande della soglia
+    z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
+    objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    
+    obj = [z[i] for i in objInd]
+    print('identObj ha trovato ' + str(len(obj)) + ' particelle')
+
+    return obj
+
+
+def Cm(z, bin_size, px_cut):
+    r=np.arange(0, min(px_cut, np.shape(z)[1]/2, np.shape(z)[0]/2), bin_size)
+    hh=np.zeros(len(r)-1)
+
+    for x0 in range(np.shape(z)[1]):
+        for y0 in range(np.shape(z)[0]):
+            for i in range(len(r)-1):
+                m=np.where( (z[max(0,int(y0-r[i+1])-1):min(np.shape(z)[0],int(y0+r[i+1])-1), max(0,int(x0-r[i+1])-1):min(np.shape(z)[1],int(x0+r[i+1])-1)] >=r[i]) and
+                            (z[max(0,int(y0-r[i+1])-1):min(np.shape(z)[0],int(y0+r[i+1])-1), max(0,int(x0-r[i+1])-1):min(np.shape(z)[1],int(x0+r[i+1])-1)] <r[i+1]) )
+                m=np.ma.masked_array(z[max(0,int(y0-r[i+1])-1):min(np.shape(z)[0],int(y0+r[i+1])-1), max(0,int(x0-r[i+1])-1):min(np.shape(z)[1],int(x0+r[i+1])-1)],
+                    mask=[~(np.sqrt( (np.ndenumerate(a))[0]-y0)**2 + (list(np.ndenumerate(a))[0]-x0)**2)>=r[i] and  np.sqrt( (list(np.ndenumerate(a))[0]-y0)**2 + ( list(np.ndenumerate(a))[1]-x0)**2)<r[i+1]) for a in z])
+
+                hh[i]+=np.mean(z[y0,x0]*m)
+        if (x0+1)%int(np.shape(z)[1]/20) ==0: print(round((x0+1)/np.shape(z)[1]*100, 0), '%')
+
+    return r+bin_size/2, hh/ (np.shape(z)[1]*np.shape(z)[0])
+
+
+
+inp=open('sphOnsph.dat') #leggo i dati
+file=inp.read()
+inp.close()
+
+start=file.find('[') +1
+end  =file.find(']', start)
+R_tip=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+start=file.find('[', end+1) +1
+end  =file.find(']', start)
+N_obj=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+start=file.find('[', end+1) +1
+end  =file.find(']', start)
+h=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+start=file.find('[', end+1) +1
+end  =file.find(']', start)
+r_part=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+start=file.find('[', end+1) +1
+end  =file.find(']', start)
+A=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+start=file.find('[', end+1) +1
+end  =file.find(']', start)
+V=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+start=file.find('[', end+1) +1
+end  =file.find(']', start)
+dV=np.fromstring(file[start:end].replace('\n',' '), sep=' ')
+
+R_rel=R_tip / h[0]
+
+x_prof= []
+z_prof= []
+for i in range(len(R_rel)+1):
+    start=file.find('[', end+1) +1
+    end  =file.find(']', start)
+    x_prof.append(np.fromstring(file[start:end].replace('\n',' '), sep=' '))
+    start=file.find('[', end+1) +1
+    end  =file.find(']', start)
+    z_prof.append(np.fromstring(file[start:end].replace('\n',' '), sep=' '))
+
+plt.figure()
+plt.title(r'$V_{cap}$ error funciton')
+plt.plot(R_rel,dV)
+plt.xlabel(r'$ R_{tip} / R_{part} $')
+plt.ylabel(r'$ \Delta V $')
+plt.grid()
+plt.show()
+
+plt.figure()
+plt.title('Deformation')
+plt.plot(R_rel,r_part/h)
+plt.xlabel(r'$ R_{tip} / R_{part} $')
+plt.ylabel(r'$ R_{dil} / R_{true} $')
+plt.grid()
+plt.show()
+
+'''
+plt.figure()
+plt.title(r'particle profile at $d/L_{px}=$'+str(round(2*R/pxlen[-1], 3)))
+for i in range(0,len(z_prof)):
+    if i==0: plt.plot(x_prof[i], z_prof[i],  label='digital map')
+    else: plt.plot(x_prof[i], z_prof[i], label=r'$ R_{tip} / R_{part} = $'+str(round(R_rel[i-1], 2)))
+
+plt.xlabel('r [npx]')
+plt.xlabel('z [npx]')
+plt.legend()
+plt.grid()
+plt.show()
+'''
+
+
+
+
+    maxh=0
+    posmax=np.append(posmax, 0)
+    R0=par.capPar(obj[0],pxlen,thres)[0]
+    for x in range(np.shape(obj[0])[0]):
+        height.append(np.amax(obj[0][0:,x])/R0)
+        if maxh<height[-1]:
+            maxh=height[-1]
+            posmax[-1]=x
+    profiles.append(np.array(height))
+    height.clear()
+
+
+np.savetxt('sphOnsph.dat', np.array([R_tip, N_obj , h_arr, r_arr, A_arr, V_arr, dV_arr]), fmt='%s',
+           header='on rows: R_tip, N_obj, h, r, A, V, dV')
+
+out=open('profiles.dat', 'w')
+for i in range(len(R_tip)):
+    out.write(str(pxlen * (np.arange(0,len(profiles[i])) - posmax[i]) )+'\n')
+    out.write(str(profiles[i])+'\n'+'\n')
+out.close()
+
 def VfracDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mean, R_std, V_real=0, loadmap=''): 
     if loadmap=='':
         z = mf.genFlat(Npx)
@@ -425,3 +684,90 @@ def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, pbroken, **kwargs):
         xmin+=dist*np.sqrt(3)/2
         bol=not(bol)
     return z
+
+
+import mapsfunction as mf
+import parameters as par
+import scipy.ndimage.morphology as mph
+import numpy as np
+import matplotlib.pyplot as plt
+#from scipy.ndimage import gaussian_filter
+#import time
+
+plt.close('all') #chiude tutte le figure aperte
+#probabilmente devo avere Npxtip<280 circa (16gb ram con 25% circa occupato)
+#278 funziona, 296 no
+
+def volsphere(R): return 5/3*np.pi*R**3
+def volsemisph(R): return 2/3*np.pi*R**3
+
+filename='conv_sphere.dat'
+L=100 #lato mappa
+q=1.3/10 #rapporto raggio/lato
+Npx=np.linspace(60,400,8)
+
+pxlen=L/Npx
+thres=0 #soglia
+#-----------------------------------------------
+R=q*L
+htip=2*R*1.02
+R_tip=np.linspace(R/5,3*R, 8)
+
+V_red_dil = []
+height = []
+profiles = []
+posmax = []
+
+z=mf.genFlat(int(Npx[-1]))
+z=mf.genSphere(z,pxlen[-1],np.array([L/2, L/2]),np.array([R]))
+obj = mf.identObj(z,thres)[0]
+V_red_calc= par.V(obj, pxlen[-1]) / volsphere(R)
+
+maxh=0
+posmax.append(0)
+for x in range(np.shape(obj)[0]):
+    height.append(np.amax(obj[0:,x])/R)
+    if maxh<height[-1]:
+        maxh=height[-1]
+        posmax[-1]=x
+profiles.append(np.array(height))
+height.clear()
+
+for rtip in R_tip:
+    for i in range(len(Npx)): #iterazione su risoluzione
+        print('R_tip=', rtip , ' Npx=', int(Npx[i]))
+        z=mf.genFlat(int(Npx[i]))
+        z=mf.genSphere(z,pxlen[i],np.array([L/2, L/2]),np.array([R]))
+        
+        tip=mf.genSemisphTip(pxlen[i],htip,r=rtip)
+        z = mph.grey_dilation(z, structure=-tip)
+        if rtip==R_tip[-1] and i==0: mf.plotfalsecol(z,pxlen[i])
+        obj = mf.identObj(z,thres)[0]
+        V_red_dil.append(par.V(obj, pxlen[i]) / volsphere(R))
+        
+        if i==len(Npx)-1:
+            maxh=0
+            posmax.append(0)
+            for x in range(np.shape(obj)[0]):
+                height.append(np.amax(obj[0:,x])/R)
+                if maxh<height[-1]:
+                    maxh=height[-1]
+                    posmax[-1]=x
+            profiles.append(np.array(height))
+            height.clear()
+
+R_tip=np.append(R_tip, R)
+print('printing data in',filename)
+out=open(filename, 'w')
+out.write('r_tip (R_part in last pos): '+str(R_tip)+'\n')
+out.write('Lpx: '+str(pxlen)+'\n')
+out.write('digital map volume: ['+str(np.array(V_red_calc))+']\n')
+out.write('dilation map volume: '+str(np.array(V_red_dil))+'\n')
+out.write('x_surf, surface profile, x dilated, map profile\n')
+out.write(str(pxlen[-1] * (np.arange(0,len(profiles[0])) - posmax[0]) )+'\n')
+out.write(str(profiles[0])+'\n'+'\n')
+R_tip=np.delete(R_tip, -1)
+for i in range(1,len(R_tip)+1):
+    out.write(str(pxlen[-1] * (np.arange(0,len(profiles[i])) - posmax[i]) )+'\n')
+    out.write(str(profiles[i])+'\n'+'\n')
+out.close()

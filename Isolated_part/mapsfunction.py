@@ -3,6 +3,7 @@ from random import uniform
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import scipy.ndimage
+import scipy.ndimage.morphology as mph
 
 def genFlat(Npx):
     z = np.zeros([Npx, Npx])
@@ -146,11 +147,13 @@ def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kw
     xmax=kwargs.get('xmax',pxlen*len(z)-R)
     ymax=kwargs.get('ymax',pxlen*len(z)-R)
 
+    counter=0
     bol=True
     while xmin<xmax:
         if bol: y0=ymin
         else: y0=ymin+dist/2
         while y0<ymax:
+            counter+=1
             
             h=uniform(hmin, hmax)
             if par=='r': R=uniform(parmin, parmax)
@@ -197,7 +200,7 @@ def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kw
                     while (xrnd-xmin)**2+(yrnd-y0)**2> (x_ell-xmin)**2+(y_ell-y0)**2:
                         xrnd=uniform(xmin-R,xmin+R)
                         yrnd=uniform(y0-r  ,y0+r)
-                        if x*pxlen-xmin!=0:
+                        if xrnd-xmin!=0:
                             coeff1=(yrnd-y0)/(xrnd-xmin)
                             x_ell=xmin + r/np.sqrt(coeff1**2 + coeff2**2)
                             y_ell=y0 + coeff1*(x_ell-xmin)
@@ -207,7 +210,7 @@ def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kw
 
                     p.append(xrnd)
                     p.append(yrnd)
-                    p.append(h*(1 - np.sqrt( ((x*pxlen-xmin)**2+(y*pxlen-y0)**2)/((x_ell-xmin)**2+(y_ell-y0)**2)  ) ))
+                    p.append(h*(1 - np.sqrt( ((xrnd-xmin)**2+(yrnd-y0)**2)/((x_ell-xmin)**2+(y_ell-y0)**2)  ) ))
                 a=(p[4]-p[1])*(p[8]-p[2])-(p[5]-p[2])*(p[7]-p[1]) #build plane
                 b=-(p[3]-p[0])*(p[8]-p[2])+(p[5]-p[2])*(p[6]-p[0])
                 c=(p[3]-p[0])*(p[7]-p[1])-(p[4]-p[1])*(p[6]-p[0])
@@ -215,17 +218,23 @@ def genHexSpikes(z, pxlen, hmin, hmax, dist, parmin, parmax, emax, pbroken, **kw
                 p.clear()
                 for x in range(lwrx,uprx):
                     for y in range(lwry,upry):
-                       if ((x*pxlen-xmin)/R)**2 + ((y*pxlen-y0)/r)**2 <1:
-                            coeff1=(y*pxlen-y0)/(x*pxlen-xmin)
-                            if x*pxlen>xmin: x_ell=xmin + r/np.sqrt(coeff1**2 + coeff2**2)
-                            else: x_ell=xmin - r/np.sqrt(coeff1**2 + coeff2**2)
-                            y_ell=y0 + coeff1*(x_ell-xmin)
+                        if ((x*pxlen-xmin)/R)**2 + ((y*pxlen-y0)/r)**2 <1:
+                            if x*pxlen-xmin!=0:
+                                coeff1=(y*pxlen-y0)/(x*pxlen-xmin)
+                                if x*pxlen>xmin: x_ell=xmin + r/np.sqrt(coeff1**2 + coeff2**2)
+                                else: x_ell=xmin - r/np.sqrt(coeff1**2 + coeff2**2)
+                                y_ell=y0 + coeff1*(x_ell-xmin)
+                            else:
+                                x_ell=xmin
+                                y_ell=y0 + r
+                            
                             if -(a*x*pxlen+b*y*pxlen+d)/c>0:
                                 z[y,x]+=min(h*(1 - np.sqrt( ((x*pxlen-xmin)**2+(y*pxlen-y0)**2)/((x_ell-xmin)**2+(y_ell-y0)**2)  ) ), -(a*x*pxlen+b*y*pxlen+d)/c)
 
             y0+=dist
         xmin+=dist*np.sqrt(3)/2
         bol=not(bol)
+    print(counter, 'particles generated')
     return z
 
 def Ncp(pxlen,Npx,r):
@@ -498,15 +507,81 @@ def genRndSemisphTip(pxlen,h,low,up):
     z = z -np.amin(z)
     return z
 
+'''
 def identObj(z, thres):
     z_binary = (z>thres) #vero se elemento e piu grande della soglia
     z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
-    objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
     
-    obj = [z[i] for i in objInd]
-    print('identObj ha trovato ' + str(len(obj)) + ' particelle')
+    obj_list = []
+    
+    for i in range(len(obj_ind)):
+        z_single_obj = z.copy()
+        z_single_obj[np.where(z_labeled!=i+1)] = 0
+        obj_list.append(z_single_obj[obj_ind[i]])
+    print('identObj found ' + str(len(obj_list)) + ' objects')
+    return obj_list, z_labeled, obj_ind
 
-    return obj
+
+def identObj(z, thres):
+    z_binary = (z>thres) #vero se elemento e piu grande della soglia
+    z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
+    obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    
+    obj_list = []
+    
+    # prevent overlap of single structures
+    for i in range(len(obj_ind)):
+        z_single_obj = z.copy()
+        z_single_obj[np.where(z_labeled!=i+1)] = 0
+        
+        # remove zero rows and columns
+        z_single_obj = z_single_obj[~np.all(z_single_obj == 0, axis=1)]
+        z_single_obj = z_single_obj[:, ~np.all(z_single_obj == 0, axis=0)]
+        
+        obj_list.append(z_single_obj)
+
+    return obj_list, z_labeled, obj_ind
+'''
+
+def identObj(z, thres, Npx_min):
+    z_binary = (z>thres) #vero se elemento e piu grande della soglia
+    z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
+    obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+        
+    obj_list = []
+    keep_obj_nr = []
+    # prevent overlap of single structures
+    for i in range(len(obj_ind)):
+        z_single_obj = z.copy()
+        z_single_obj[np.where(z_labeled!=i+1)] = 0
+        
+        # remove zero rows and columns
+        z_single_obj = z_single_obj[~np.all(z_single_obj == 0, axis=1)]
+        z_single_obj = z_single_obj[:, ~np.all(z_single_obj == 0, axis=0)]
+        
+        # keep only objects with a minimum pixel size
+        if sum(z_single_obj.shape) >= Npx_min:
+            obj_list.append(z_single_obj)
+            keep_obj_nr.append(i)
+    
+    # relabel objects considering only kept objects
+    keep_obj_nr = np.array(keep_obj_nr)
+    i = 0
+    while i < np.max(z_labeled):
+        if i in keep_obj_nr:
+            i += 1
+            continue
+        z_labeled[np.where(z_labeled==i+1)] = 0
+        z_labeled[np.where(z_labeled>i+1)] += -1
+        keep_obj_nr += -1
+        i += 1
+        
+    obj_ind = [obj_ind[i] for i in keep_obj_nr]
+        
+    print('identObj found ' + str(len(obj_list)) + ' objects')   
+
+    return obj_list, z_labeled, obj_ind
 
 def plotview(z,pxlen,theta,phi):
     fig = plt.figure()
@@ -527,9 +602,10 @@ def plotview(z,pxlen,theta,phi):
     ax.set_zlabel('Z (nm)')
     plt.show()
     
-def plotfalsecol(z,pxlen):
-    plt.figure()
-    plt.title('res= '+str(pxlen)+'nm')
+def plotfalsecol(z,pxlen, figx=0, figy=0):
+    if figx!=0: plt.figure(figsize=(figx,figy))
+    else: plt.figure()
+    plt.title(r'$ L_{px}= '+str(pxlen)+'nm $')
     plt.axis('equal')
     
     X = np.linspace(0,pxlen*np.shape(z)[1],num=np.shape(z)[1])
@@ -543,3 +619,13 @@ def plotfalsecol(z,pxlen):
     plt.xlabel('X (nm)')
     plt.ylabel('Y (nm)')
     plt.show()
+    
+    
+def plotThres(z, z_labeled, pxlen):
+    plotfalsecol(z, pxlen)
+    for i in range(1, int(np.max(z_labeled)) + 1):
+        obj_i_edge = (z_labeled==i) & mph.binary_dilation(z_labeled!=i, structure=np.ones([3,3])) # edge is part of structure
+        index_x = np.where(obj_i_edge==1)[1] + 0.5
+        index_y = np.where(obj_i_edge==1)[0] + 0.5
+        plt.plot(index_x*pxlen, index_y*pxlen, color='r', marker='s', linestyle='None', markersize=2)
+    plt.tight_layout()

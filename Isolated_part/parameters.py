@@ -20,14 +20,16 @@ def V(z,pxlen):
     #z ha gia unità fisiche
     return pxlen*pxlen*somma
 
-def specArea(z,pxlen):
+def specArea(z):
 #first order specific area
     A=0
-    for x in range(np.shape(z)[1]):
-        for y in range(np.shape(z)[0]):
-            A+=np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], pxlen]))/2
-            A+=np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], pxlen]))/2
-    return A/(len(z)-1)**2
+    for x in range(np.shape(z)[1]-1):
+        for y in range(np.shape(z)[0]-1):
+    #        z_sorted=np.reshape(z[x:x+2, y:y+2], 4)
+     #       z_sorted=np.sort(z_sorted)
+            A+=np.linalg.norm(np.array([-z[y,x+1]+z[y,x], -z[y+1,x]+z[y,x], 1]))/2
+            A+=np.linalg.norm(np.array([z[y+1,x]-z[y+1,x+1], z[y,x+1]-z[y+1,x+1], 1]))/2
+    return A /((np.shape(z)[1]-1)*(np.shape(z)[0]-1))
 
 def coverage(z, thres):
     N_tot = np.shape(z)[1]*np.shape(z)[0]
@@ -73,7 +75,7 @@ def calcParams(z,pxlen,thres):
               'std': h_std(z,pxlen),
         #      'skew': skew(z,pxlen),
               'V': V(z,pxlen),
-         #     'specArea': specArea(z,pxlen),
+          #    'specArea': specArea(z),
               'coverage': coverage(z,thres)}
     return params
     
@@ -210,11 +212,12 @@ def paramvsRpart(Npx, pxlen, N_part, R_part_min, R_part_max, R_part_step,
     print('datas printed in '+filename)
 
 def capPar(z,pxlen,thres):
-    h=np.amax(z) #già in unità fisiche l'asse z, come anche V
-    props=sk.regionprops( sk.label(z>thres) )
+    h=np.amax(z)-thres #già in unità fisiche l'asse z, come anche V
+    ind= z>thres
+    props=sk.regionprops( sk.label(ind) )
     e=props[0].eccentricity #eccentricità
     a=props[0].equivalent_diameter /2 #raggio equivalente cap
-    return h, a*pxlen, props[0].area *pxlen**2, V(z,pxlen), e
+    return h, a*pxlen, props[0].area *pxlen**2, np.sum(z[ind]-thres)* pxlen**2, e
 
 def revimg_filter(obj,pxlen,thres, etol, msqertol, relVtol):
     filtered=[]
