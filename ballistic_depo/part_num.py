@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 from os.path import isfile
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from scipy.optimize import curve_fit
-from scipy.stats import linregress
+#from scipy.optimize import curve_fit
+#from scipy.stats import linregress
+#from mpi4py import MPI
 
 def reconstLogNorm(z, pxlen, thres, N_part, R_mu_real, R_sigma_real):
     z_obj_list, z_labeled = mf.identObj(z, thres)
@@ -43,10 +44,10 @@ def partNum(z, pxlen, R_mu, R_sigma):
     
     V_mean = 4/3 * np.pi * np.exp(3*R_mu + 3**2*R_sigma**2/2)
     
-    N_part = V / V_mean
-    eff_cov = N_part / A
+    N_particles = V / V_mean
+    eff_cov = N_particles / A
     
-    return N_part, eff_cov
+    return N_particles, eff_cov
 
 def C_gauss_prof_semilog(lw, L_corr): return -lw[0]/L_corr + 2*np.ln(lw[1])
 def G_gauss_prof(lLw, alfa):
@@ -58,17 +59,153 @@ def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mu, R_s
     N_part = np.round(10**N_part)
     N_part.astype(int, copy=False)
     
+#    N_est = np.array([]) #2+1D only
+    V_est = np.array([])
+    rms_est = np.array([])
+    h_est = np.array([])
+    h_top = np.array([])
+    
+    C_true=[]
+    G_true=[]
+    C2_true=[]
+    G2_true=[]
+    C_list=[]
+    G_list=[]
+
+    for i in range(step_sim):
+        if firstmap=='': #initialize map
+            #z = np.zeros(Npx) #1+1D
+            z=mf.genFlat(Npx)
+            N_prec=0
+            V_real=0
+        else:
+            z = np.loadtxt(firstmap)
+            dotpos=firstmap.find('.')
+            start=dotpos-1
+            for i in range(dotpos-1):
+                if firstmap[start]=='_': break
+                start-=1
+            N_prec=int(firstmap[start+1:dotpos])
+            
+            out=open(firstmap)
+            head=out.readline()
+            out.close()
+            start=head.find('V=')+2
+            V_real=float(head[start:head.find(';', start)])
+
+        for N in N_part:
+            print('Sim.',i+1,'; N=',str(N)[:len(str(N))-2], end=' ')
+            if usefile and isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat'):
+                print('map from file ...', end=' ')
+                z= np.loadtxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
+                out=open('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
+                head=out.readline()
+                out.close()
+                start=head.find('V=')+2
+                V_real=float(head[start:head.find(';', start)])
+            else:
+                #print('generating map ...', end=' ')
+                #z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mu,R_sigma)
+                #z=mf.genLattice1d(z,pxlen,int(N-N_prec)) #1+1D
+                #V_real += (N-N_prec)* pxlen**2 #1+1D
+                z=mf.genLattice2d(z,pxlen,int(N-N_prec))
+                V_real += (N-N_prec)* pxlen**3
+                #V_real += 4/3*np.pi * np.sum(R_part_real**3)
+                if savefile: np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='V='+str(V_real)+'; Npx,pxlen,Npart in filename')
+                #if savefile: np.savetxt('matrice.mat', z)
+            N_prec=N
+            
+            #print('computing parameters ...')
+            #N_est=np.append(N_est, partNum(z,pxlen,R_mu,R_sigma)[0]/N)
+            V_est=np.append(V_est, par.V(z,pxlen)/V_real)
+            rms_est=np.append(rms_est, np.std(z))
+            h_est=np.append(h_est, np.mean(z))
+            h_top=np.append(h_top, np.amax(z))
+            
+            #print('computing correlations ...')
+            l,C=par.C_profile(z, pxlen, 1)
+            C_list.append(C)
+            #C_list.append(par.C_1d(z)) #1+1D
+            
+            l,C=par.G_profile(z, pxlen, 1)
+            G_list.append(C)
+            #G_list.append(par.G_1d(z)) #1+1D
+            print('',end='\r')
+            #print()
+        
+        if i==0: 
+            for el in C_list:
+                C_true.append(el)
+                C2_true.append(el**2)
+            for el in G_list:
+                G_true.append(el)
+                G2_true.append(el**2)
+        else:
+            for i in range(len(C_true)):
+                C_true[i]=C_true[i]+C_list[i]
+                C2_true[i]=C2_true[i]+C_list[i]**2
+            for i in range(len(G_true)):
+                G_true[i]=G_true[i]+G_list[i]
+                G2_true[i]=G2_true[i]+G_list[i]**2
+        C_list.clear()
+        G_list.clear()
+
+    
+
+    filename=['V_relVsN.dat', 'rmsVsN.dat', 'hVsN.dat', 'maxhVsN.dat']
+    est=[V_est, rms_est, h_est, h_top]
+    
+    for j in range(len(est)):
+        err=np.array([])
+        for i in range(len(N_part)):
+            if step_sim==1: err=np.append(err, 0)
+            else: err=np.append(err, np.std(est[j][i::len(N_part)]))
+            est[j][i]=np.mean(est[j][i::len(N_part)])
+
+    
+        np.savetxt(filename[j], np.array([ est[j][:len(N_part)], N_part, err ]),
+                   header=str(Npx) + ' ' + str(pxlen) + '\n' +
+                   r'$N_{px}$ $L_{px}$')
+                   #header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
+                   #r'$\mu_R$ $\sigma_R$ $N_{px}$ $L_{px}$')
+        print('data saved in '+ filename[j] +' and in folder maps/')
+    
+    C_true=np.array(C_true)/step_sim
+    G_true=np.array(G_true)/step_sim
+    C2_true=np.array(C2_true)/step_sim - C_true**2
+    G2_true=np.array(G2_true)/step_sim - G_true**2
+#    np.savetxt('x.dat', l)
+    np.savetxt('C.dat', C_true)
+    np.savetxt('G.dat', G_true)
+    np.savetxt('C2.dat', C2_true)
+    np.savetxt('G2.dat', G2_true)
+    print('correlations saved in files C,G,C2,G2')
+
+def partDep_mpi(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mu, R_sigma, firstmap='', usefile=False, savefile=False):
+    N_part = np.linspace(np.log10(N_part_min), np.log10(N_part_max), N_part_step)
+    N_part = np.round(10**N_part)
+    N_part.astype(int, copy=False)
+    
     N_est = np.array([])
     V_est = np.array([])
     rms_est = np.array([])
     h_est = np.array([])
+    h_top = np.array([])
     
-    L_corr_est = np.array([])
-    L_corr_err = np.array([])
-    alfa_est=np.array([])
-    alfa_err=np.array([])
+#    L_corr_est = np.array([])
+#    L_corr_err = np.array([])
+#    alfa_est=np.array([])
+#    alfa_err=np.array([])
     
-    for i in range(step_sim):
+    C_true=[]
+    G_true=[]
+    C2_true=[]
+    G2_true=[]
+    C_list=[]
+    G_list=[]
+    comm=MPI.COMM_WORLD
+    size_mpi=comm.Get_size()
+    for i in range(step_sim/size_mpi):
         if firstmap=='': #initialize map
             z = mf.genFlat(Npx)
             N_prec=0
@@ -91,7 +228,7 @@ def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mu, R_s
         for N in N_part:
             print('Sim.',i+1,'; N=',str(N)[:len(str(N))-2], end=' ')
             if usefile and isfile('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat'):
-                print('map from file ...')
+                print('map from file ...', end=' ')
                 z= np.loadtxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
                 out=open('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat')
                 head=out.readline()
@@ -99,58 +236,90 @@ def partDep(Npx, pxlen, step_sim, N_part_min, N_part_max, N_part_step, R_mu, R_s
                 start=head.find('V=')+2
                 V_real=float(head[start:head.find(';', start)])
             else:
-                print('generating map ...')
+                print('generating map ...', end=' ')
                 z, R_part_real = mf.genLogNormSolidSph(z,pxlen,int(N-N_prec),R_mu,R_sigma)
+                mf.plotfalsecol(z,pxlen)
                 V_real += np.sum(4/3 * np.pi * R_part_real**3)
                 if savefile: np.savetxt('maps/lognorm_'+str(Npx)+'_'+str(pxlen)+'_'+str(N)[:len(str(N))-2]+'.dat', z, header='V='+str(V_real)+'; Npx,pxlen,Npart in filename')
             N_prec=N
             
-            print('computing parameters ...', end=' ')
+            print('computing parameters ...')
             N_est=np.append(N_est, partNum(z,pxlen,R_mu,R_sigma)[0]/N)
             V_est=np.append(V_est, par.V(z,pxlen)/V_real)
             rms_est=np.append(rms_est, np.std(z))
             h_est=np.append(h_est, np.mean(z))
+            h_top=np.append(h_top, np.amax(z))
             
-            print('computing correlations ...')
-            l,C=par.C(z, pxlen, 50)
-            l*=pxlen
+            #print('computing correlations ...')
+            l,C=par.C_profile(z, 2, 800)           
+            C_list.append(C)
+       
+            l,C=par.G_profile(z, 2, 800)
+            G_list.append(C)
             
-            slope, intrc, r_val, p_val, errlinregr= linregress(l, C)
-            L_corr_est=np.append( L_corr_est, - slope**-1 )
-            L_corr_err=np.append( L_corr_err, errlinregr/slope**2)
-            L_corr_est=np.append(L_corr_est, 1)
-            l,C=par.G(z, pxlen, 50)
-            l*=pxlen
-            
-            Lforfit=np.ones(len(l))*L_corr_est[-1]
-            rmsforfit=np.ones(len(l))*rms_est[-1]
-            opt,cov= curve_fit(G_gauss_prof, (l, Lforfit, rmsforfit), C)
-            alfa_est=np.append(alfa_est, *opt)
-            alfa_err=np.append(alfa_err, *cov[0])
+        if i==0: 
+            for el in C_list:
+                C_true.append(el)
+                C2_true.append(el**2)
+            for el in G_list:
+                G_true.append(el)
+                G2_true.append(el**2)
+        else:
+            for i in range(len(C_true)):
+                C_true[i]=C_true[i]+C_list[i]
+                C2_true[i]=C2_true[i]+C_list[i]**2
+            for i in range(len(G_true)):
+                G_true[i]=G_true[i]+G_list[i]
+                G2_true[i]=G2_true[i]+G_list[i]**2
+        C_list.clear()
+        G_list.clear()
 
-    filename=['N_relVsN.dat', 'V_relVsN.dat', 'rmsVsN.dat', 'hVsN.dat', 'L_corrVsN.dat', 'alfaVsN.dat']
-    est=[N_est, V_est, rms_est, h_est, L_corr_est, alfa_est]
+    est=[N_est, V_est, rms_est, h_est, h_top]
+    rank=comm.Get_rank()
+    if rank!=0: comm.Send(est, dest=0)
+    if rank==0:
+        rec=[]
+        for i in range(1, size_mpi):
+            comm.Recv(rec, source=i)
+            for k in range(len(est)):
+                est[k]=np.append(est[k], rec[k])
+            rec.clear()
+      
+    C_true=np.array(C_true)/(step_sim/size_mpi)
+    G_true=np.array(G_true)/(step_sim/size_mpi)
+    C2_true=np.array(C2_true)/(step_sim/size_mpi) - C_true**2
+    G2_true=np.array(G2_true)/(step_sim/size_mpi) - G_true**2
+    corr=[C_true, G_true, C2_true, G2_true]
     
-    for j in range(len(est)):
-        if j<4:
+    if rank!=0: comm.Send(corr, dest=0)
+    if rank==0:
+        for i in range(1, size_mpi):
+            comm.Recv(rec, source=i)
+            for k in range(4):
+                corr[k]=np.append(corr[k], rec[k])
+            rec.clear()
+        corr[0]=np.array(corr[0])/size_mpi
+        corr[1]=np.array(corr[1])/size_mpi
+        corr[2]=np.array(corr[2])/size_mpi - corr[0]**2
+        corr[3]=np.array(corr[3])/size_mpi - corr[1]**2
+                
+        filename=['N_relVsN.dat', 'V_relVsN.dat', 'rmsVsN.dat', 'hVsN.dat', 'maxhVsN.dat']
+        
+        for j in range(len(est)):
             err=np.array([])
             for i in range(len(N_part)):
                 if step_sim==1: err=np.append(err, 0)
                 else: err=np.append(err, np.std(est[j][i::len(N_part)]))
                 est[j][i]=np.mean(est[j][i::len(N_part)])
-        else:
-            if j==4: err=L_corr_err
-            if j==5: err=alfa_err
-            for i in range(len(N_part)):
-                est[j][i]=np.mean(est[j][i::len(N_part)])
-                err[i]=   np.mean(err[i::len(N_part)]) /np.sqrt(step_sim -1)
-
     
-        np.savetxt(filename[j], np.array([ est[j][:len(N_part)], N_part, err ]),
-                   header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
-                   r'$\mu _R$ $\sigma _R$ $N_{px}$ $L_{px}$')
-        print('data saved in '+ filename[j] +' and in folder maps/')
-
+        
+            np.savetxt(filename[j], np.array([ est[j][:len(N_part)], N_part, err ]),
+                       header=str(R_mu) + ' ' + str(R_sigma) + ' ' + str(Npx) + ' ' + str(pxlen) + '\n' +
+                       r'$\mu _R$ $\sigma _R$ $N_{px}$ $L_{px}$')
+            print('data saved in '+ filename[j] +' and in folder maps/')
+        
+        np.savetxt('correlations.dat', np.array([ l*pxlen, corr[0], corr[1], corr[2], corr[3]]), fmt='%s')
+   
 def plotTipDep(z, pxlen, h, R_mu, R_sigma, N_part_real):
     R_tip = np.linspace(0.01, 20, 10)
     N_part_est = []

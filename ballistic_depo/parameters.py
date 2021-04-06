@@ -5,6 +5,8 @@ import mapsfunction as mf
 import skimage.measure as sk
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+#from numba.typed import List
+#from numba import guvectorize, float64
 
 def skew(z):
     std=np.std(z)
@@ -12,14 +14,7 @@ def skew(z):
     else: z_skew=0
     return z_skew
 
-def V(z,pxlen):
-    somma=0
-    
-    for x in range(np.shape(z)[1]):
-        for y in range(np.shape(z)[0]):
-            somma+=z[y,x]
-    #z ha gia unità fisiche
-    return pxlen*pxlen*somma
+def V(z,pxlen): return pxlen**len(np.shape(z)) *np.sum(z)
 
 def specArea(z):
 #first order specific area
@@ -51,45 +46,169 @@ def h_max(z,n):
     if n%2==0: return (top[int(n/2)]+top[int(n/2)-1])/2
     else: return top[int(n/2)]
 
-def C(z, bin_size, px_cut):
-    r=np.arange(bin_size/2, min(px_cut, np.sqrt(np.shape(z)[1]**2 + np.shape(z)[0]**2)), bin_size)
-    counter=np.zeros(len(r))
-    hh=np.zeros(len(r))
+#@njit
+#@guvectorize([(float64[:,:], float64, float64[:], float64[:])], '(n,n),()->(n),(n)')
+def C_fast(z, indz, bin_size):
+    print('computing height correlation function')
+    r=np.arange(0, 2/3* min(np.shape(z)[1], np.shape(z)[0])+bin_size, bin_size)
+    counter=np.zeros(len(r)-1)
+    hh=np.zeros(len(r)-1)
+    
+    wh=np.where(z>=np.amin(z))
+#    np.savetxt('wh.dat', wh[0][0::np.shape(z)[1]])
 
     for x0 in range(np.shape(z)[1]):
+        if (x0+1)%int(np.shape(z)[1]/10)==0: print(x0/np.shape(z)[1]*100,'%',end=' ')
         for y0 in range(np.shape(z)[0]):
-            for x in range(x0, int(min(np.shape(z)[1], px_cut)) ):
-                if x==x0: starty=y0
-                else: starty=0
+            for i in range(len(r)-1):
+                hh[i]=np.sum(z[indz])*z[y0,x0]
+                counter[i]+=z[indz].size
+    
+#    rout=np.delete(r,-1)+bin_size
+#    hout/=counter
+#    return np.delete(r, -1) + bin_size, hh/counter
+
+    
+def G_fast(z, bin_size):
+    print('computing height-height correlation function')
+    r=np.arange(0, 2/3* min(np.shape(z)[1], np.shape(z)[0])+bin_size, bin_size)
+    counter=np.zeros(len(r)-1)
+    hh=np.zeros(len(r)-1)
+    
+    wh=np.where(z>=np.amin(z))
+#    np.savetxt('wh.dat', wh[0][0::np.shape(z)[1]])
+
+    for x0 in range(np.shape(z)[1]):
+        if (x0+1)%int(np.shape(z)[1]/10)==0 and x0+1!=np.shape(z)[1]: print(round((x0+1)/np.shape(z)[1]*100, 0),'%',end=' ')
+        for y0 in range(np.shape(z)[0]):
+            for i in range(len(r)-1):
+#                index=(wh[max(0,y0-int(r[i+1])-1):min(np.shape(z)[0],y0+int(r[i+1])+2), max(0,x0-int(r[i+1])-1):min(np.shape(z)[1],x0+int(r[i+1])+2)] <r[i+1])
+                index= (np.sqrt((wh[0][0:] - x0)**2 + (wh[1][0:] - y0)**2) >= r[i]) & (np.sqrt((wh[0][0:] - y0)**2 + (wh[1][0:] - x0)**2) < r[i+1])
+                index= index.reshape([np.shape(z)[0],np.shape(z)[1]])
                 
-                for y in range(starty, int(min(np.shape(z)[0], px_cut)) ):
-                    l=np.sqrt( (x-x0)**2 +(y-y0)**2 )
-                    bin_hist=int(l/bin_size)
-                    if bin_hist<len(r):
-                        counter[bin_hist]+=1
-                        hh[bin_hist]+=z[y0,x0]*z[y,x]
+                hh[i]=np.sum((z[y0,x0]-z[index])**2)
+                counter[i]+=z[index].size
     
-    return r, hh/counter
+#    rout=np.delete(r,-1)+bin_size
+#    hout/=counter
+    return np.delete(r, -1) + bin_size, hh/counter
+
+def C(z, bin_size):
+    print('computing height correlation function')
+    r=np.arange(0, 2/3* min(np.shape(z)[1], np.shape(z)[0])+bin_size, bin_size)
+    counter=np.zeros(len(r)-1)
+    hh=np.zeros(len(r)-1)
     
-def G(z, bin_size, px_cut):
-    r=np.arange(bin_size/2, min(px_cut, np.sqrt(np.shape(z)[1]**2 + np.shape(z)[0]**2)), bin_size)
+    wh=np.where(z>=np.amin(z))
+#    np.savetxt('wh.dat', wh[0][0::np.shape(z)[1]])
+
+    for x0 in range(np.shape(z)[1]):
+        if (x0+1)%int(np.shape(z)[1]/10)==0: print(x0/np.shape(z)[1]*100,'%',end=' ')
+        for y0 in range(np.shape(z)[0]):
+            for i in range(len(r)-1):
+#                index=(wh[max(0,y0-int(r[i+1])-1):min(np.shape(z)[0],y0+int(r[i+1])+2), max(0,x0-int(r[i+1])-1):min(np.shape(z)[1],x0+int(r[i+1])+2)] <r[i+1])
+                index= (np.sqrt((wh[0][0:] - x0)**2 + (wh[1][0:] - y0)**2) >= r[i]) & (np.sqrt((wh[0][0:] - y0)**2 + (wh[1][0:] - x0)**2) < r[i+1])
+                index= index.reshape([np.shape(z)[0],np.shape(z)[1]])
+                
+                hh[i]+=np.sum(z[y0,x0]*z[index])
+                counter[i]+=z[index].size
+    
+#    rout=np.delete(r,-1)+bin_size
+#    hout/=counter
+    return np.delete(r, -1) + bin_size, hh/counter
+
+    
+def G(z, bin_size):
+    print('computing height-height correlation function')
+    r=np.arange(0, 2/3* min(np.shape(z)[1], np.shape(z)[0])+bin_size, bin_size)
+    counter=np.zeros(len(r)-1)
+    hh=np.zeros(len(r)-1)
+    
+    wh=np.where(z>=np.amin(z))
+#    np.savetxt('wh.dat', wh[0][0::np.shape(z)[1]])
+
+    for x0 in range(np.shape(z)[1]):
+        if (x0+1)%int(np.shape(z)[1]/10)==0 and x0+1!=np.shape(z)[1]: print(round((x0+1)/np.shape(z)[1]*100, 0),'%',end=' ')
+        for y0 in range(np.shape(z)[0]):
+            for i in range(len(r)-1):
+#                index=(wh[max(0,y0-int(r[i+1])-1):min(np.shape(z)[0],y0+int(r[i+1])+2), max(0,x0-int(r[i+1])-1):min(np.shape(z)[1],x0+int(r[i+1])+2)] <r[i+1])
+                index= (np.sqrt((wh[0][0:] - x0)**2 + (wh[1][0:] - y0)**2) >= r[i]) & (np.sqrt((wh[0][0:] - y0)**2 + (wh[1][0:] - x0)**2) < r[i+1])
+                index= index.reshape([np.shape(z)[0],np.shape(z)[1]])
+                
+                hh[i]+=np.sum((z[y0,x0]-z[index])**2)
+                counter[i]+=z[index].size
+    
+#    rout=np.delete(r,-1)+bin_size
+#    hout/=counter
+    return np.delete(r, -1) + bin_size, hh/counter
+
+def C_profile(z, pxlen, bin_size):
+    L_x=np.shape(z)[1]
+    r=np.arange(bin_size/2, L_x*pxlen, bin_size)
+    counter=np.zeros(len(r))
+    hh=np.zeros(len(r))
+    av=np.mean(z)
+    
+    for x0 in range(0, L_x):
+        for x in range(x0,L_x):
+            bin_hist=int(abs(x0-x)*pxlen/bin_size)
+            if bin_hist<len(r):
+                counter[bin_hist]+=np.shape(z)[0]
+                hh[bin_hist]+=np.sum( (z[0:,x0]-av)*(z[0:,x]-av) )
+                
+    for y0 in range(0, L_x):
+        for y in range(y0,L_x):
+            bin_hist=int(abs(y0-y)*pxlen/bin_size)
+            if bin_hist<len(r):
+                counter[bin_hist]+=np.shape(z)[1]
+                hh[bin_hist]+=np.sum( (z[y0,0:]-av)*(z[y,0:]-av) )
+    
+    return r-0.5, hh/counter
+
+def G_profile(z, pxlen, bin_size):
+    L_x=np.shape(z)[1]
+    r=np.arange(bin_size/2, L_x*pxlen, bin_size)
     counter=np.zeros(len(r))
     hh=np.zeros(len(r))
     
-    for x0 in range(np.shape(z)[1]):
-        for y0 in range(np.shape(z)[0]):
-            for x in range(x0, int(min(np.shape(z)[1], px_cut)) ):
-                if x==x0: starty=y0
-                else: starty=0
+    for x0 in range(0, L_x):
+        for x in range(x0,L_x):
+            bin_hist=int(abs(x0-x)*pxlen/bin_size)
+            if bin_hist<len(r):
+                counter[bin_hist]+=np.shape(z)[0]
+                hh[bin_hist]+=np.sum((z[0:,x0]-z[0:,x])**2)
                 
-                for y in range(starty, int(min(np.shape(z)[0], px_cut)) ):
-                    l=np.sqrt( (x-x0)**2 +(y-y0)**2 )
-                    bin_hist=int(l/bin_size)
-                    if bin_hist<len(r):
-                        counter[bin_hist]+=1
-                        hh[bin_hist]+=(z[y0,x0]-z[y,x])**2
+    for y0 in range(0, L_x):
+        for y in range(y0,L_x):
+            bin_hist=int(abs(y0-y)*pxlen/bin_size)
+            if bin_hist<len(r):
+                counter[bin_hist]+=np.shape(z)[1]
+                hh[bin_hist]+=np.sum((z[y0,0:]-z[y,0:])**2)
     
-    return r, hh/counter 
+    return r-0.5, hh/counter
+
+def C_1d(z):
+    Corr=np.array([])
+    av=np.mean(z)
+    
+    for x0 in range(len(z)):
+        s=0
+        for x in range(len(z)-x0):
+            s+=(z[x]-av)*(z[x+x0]-av)
+        Corr=np.append(Corr, s/(len(z)-x0))
+
+    return Corr
+
+def G_1d(z):
+    Corr=np.array([])
+    
+    for x0 in range(len(z)):
+        s=0
+        for x in range(len(z)-x0):
+            s+=(z[x]-z[x+x0])**2
+        Corr=np.append(Corr, s/(len(z)-x0))
+
+    return Corr
 
 def wavelength(z,pxlen,direction):
     if direction=='x': 

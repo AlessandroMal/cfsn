@@ -8,7 +8,6 @@ def genFlat(Npx):
     z = np.zeros([Npx, Npx])
     return z
 
-
 def genNormNoise(z,pxlen,var,Ltile):
     l=int(Ltile/pxlen)
     ntiles=int(len(z)/l)
@@ -111,6 +110,7 @@ def genUnifSolidSph(z,pxlen,Nsph,rmin,rmax, **kwargs):
                         d_min=d
                         r2_contact=r2
         
+        print(r2_contact, np.sqrt(r2_contact))
         z0=z[y_contact,x_contact] - (R - np.sqrt(R**2 - r2_contact)) #punto piu basso della nuova sfera
         for x in range(lwrx,uprx): #deposito
             for y in range(lwry,upry):
@@ -126,8 +126,10 @@ def genLogNormSolidSph(z,pxlen,Nsph,mu,sigma, **kwargs):
     ymax=kwargs.get('ymax',pxlen*len(z))
 
     R_list = []
+    rng = np.random.default_rng()
     for i in range(Nsph):
-        R = np.random.lognormal(mu, sigma)
+        #R = np.random.lognormal(mu, sigma)
+        R = rng.lognormal(mu, sigma)
         R_list.append(R)
         x0 = uniform(xmin, xmax)
         y0 = uniform(ymin, ymax)
@@ -161,6 +163,39 @@ def genLogNormSolidSph(z,pxlen,Nsph,mu,sigma, **kwargs):
                     z[y,x]=z0 + np.sqrt(R**2 - (x*pxlen - x0)**2 - (y*pxlen - y0)**2) + R
 
     return z, np.array(R_list)
+
+def genLattice2d(z,pxlen,Npart):
+    for i in range(Npart):
+        x0 = np.random.randint(0, np.shape(z)[1])
+        y0 = np.random.randint(0, np.shape(z)[0])
+        candidate=np.array([z[y0,x0]+pxlen])
+        
+        if x0==0: candidate=np.append(candidate, z[y0,x0+1])
+        else:
+            if x0==len(z)-1: candidate=np.append(candidate, z[y0,x0-1])
+            else:
+                candidate=np.append(candidate, z[y0,x0+1])
+                candidate=np.append(candidate, z[y0,x0-1])
+
+        if y0==0: candidate=np.append(candidate, z[y0+1,x0])
+        else:
+            if y0==len(z)-1: candidate=np.append(candidate, z[y0-1,x0])
+            else:
+                candidate=np.append(candidate, z[y0+1,x0])
+                candidate=np.append(candidate, z[y0-1,x0])
+        z[y0,x0]=np.amax(candidate)
+
+    return z
+
+def genLattice1d(z,pxlen,Npart):
+    for i in range(Npart):
+        x0 = np.random.randint(0, len(z))
+        if x0==0: z[x0]=max(z[x0]+pxlen,z[x0+1])
+        else:
+            if x0==len(z)-1: z[x0]=max(z[x0]+pxlen,z[x0-1])
+            else: z[x0]=max(z[x0]+pxlen,z[x0-1],z[x0+1])
+    return z
+
 
 ''' not usable now
 def genLogNormSolidSph_gauss(z,pxlen,Nsph, med, std_norm, std_prof, **kwargs):
@@ -643,12 +678,17 @@ def genRndSemisphTip(pxlen,h,low,up):
 def identObj(z, thres):
     z_binary = (z>thres) #vero se elemento e piu grande della soglia
     z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
-    objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
     
-    obj = [z[i] for i in objInd]
-    print('identObj ha trovato ' + str(len(obj)) + ' particelle')
+    obj_list = []
+    
+    for i in range(len(obj_ind)):
+        z_single_obj = z.copy()
+        z_single_obj[np.where(z_labeled!=i+1)] = 0
+        obj_list.append(z_single_obj[obj_ind[i]])
+    print('identObj found ' + str(len(obj_list)) + ' objects')
 
-    return obj
+    return obj_list, z_labeled, obj_ind
 
 def plotview(z,pxlen,theta,phi):
     fig = plt.figure()
