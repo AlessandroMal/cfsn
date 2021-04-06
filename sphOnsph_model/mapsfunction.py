@@ -130,6 +130,7 @@ def genLogNormSolidSph(z,pxlen,Nsph,av,var, **kwargs):
     
     for i in range(Nsph):
         R = np.random.lognormal(np.log(av / np.sqrt(1 + var**2 / av**2)), np.sqrt(np.log(1 + (var/av)**2)))
+        #R = np.random.Generator.lognormal(av, np.sqrt(var))
         R_list.append(R)
         x0 = uniform(xmin, xmax)
         y0 = uniform(ymin, ymax)
@@ -635,12 +636,16 @@ def genRndSemisphTip(pxlen,h,low,up):
 def identObj(z, thres):
     z_binary = (z>thres) #vero se elemento e piu grande della soglia
     z_labeled = scipy.ndimage.label(z_binary)[0] #numera le singole particelle
-    objInd = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
+    obj_ind = scipy.ndimage.find_objects(z_labeled) #trova gli indici delle particelle
     
-    obj = [z[i] for i in objInd]
-    print('identObj ha trovato ' + str(len(obj)) + ' particelle')
-
-    return obj
+    obj_list = []
+    
+    for i in range(len(obj_ind)):
+        z_single_obj = z.copy()
+        z_single_obj[np.where(z_labeled!=i+1)] = 0
+        obj_list.append(z_single_obj[obj_ind[i]])
+    print('identObj found ' + str(len(obj_list)) + ' objects')
+    return obj_list, z_labeled, obj_ind
 
 def plotview(z,pxlen,theta,phi):
     fig = plt.figure()
